@@ -1,0 +1,8 @@
+# This requirements_dev file lists all development dependencies for this project.
+#
+# Run 'pip install -r requirements_dev.txt' to install these dependencies.
+#
+# Note: these are not supposed to go in the lib/ directory as they are already
+#       provided by GAE. Install them to you machine or virtual environment.
+
+lxml==2.3.5

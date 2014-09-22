@@ -1,0 +1,13 @@
+application: crucial-alpha-706
+version: 1
+runtime: python27
+api_version: 1
+threadsafe: yes
+
+libraries:
+- name: lxml
+  version: "2.3.5"
+
+handlers:
+- url: .*
+  script: app.main.app

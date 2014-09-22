@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>theChive Wallboard</title>
+        <meta name="description" content="TODO">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+        <link rel="stylesheet" href="static/css/bootstrap.min.css">
+        <link rel="stylesheet" href="static/css/main.css">
+    </head>
+    <body>
+        <div id="wrap">
+            <div class="navbar navbar-default">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-responsive-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <a class="navbar-brand" href="#">
+                        the<span style="color:#02fd00">C</span>hive show
+                        <!-- <img alt="theChive" src="static/img/chive-small.png" /> -->
+                    </a>
+                </div>
+
+                <div class="navbar-collapse collapse navbar-responsive-collapse">
+                    <p class="navbar-text" id="feed-title">Loading...</p>
+
+                    <!-- <ul class="nav navbar-nav navbar-right">
+                        <li>
+                            <button type="button" class="btn btn-sm btn-default navbar-btn">Sign in</button>
+                        </li>
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">John Doe <b class="caret"></b></a>
+                            <ul class="dropdown-menu">
+                                <li><a href="#">Favorites</a></li>
+                                <li><a href="#">Settings</a></li>
+                                <li class="divider"></li>
+                                <li><a href="#">Log out</a></li>
+                            </ul>
+                        </li>
+                    </ul> -->
+                </div>
+            </div>
+
+            <!-- <div class="container">
+
+            </div> -->
+
+            <div class="frame active" id="frame-1">
+                <div class="push"></div>
+                <div class="container">
+                    <img src="static/img/chive.png" />
+                </div>
+            </div>
+
+            <div class="frame" id="frame-2">
+                <div class="push"></div>
+                <div class="container">
+                    <img src="static/img/chive.png" />
+                </div>
+            </div>
+
+            <div class="next frame active">
+                <div class="push" style="margin-bottom:-20px"></div>
+                <div class="container">
+                    <button class="btn btn-sm btn-default" id="btn-next">
+                        <span class="glyphicon glyphicon-chevron-right"></span>
+                    </button>
+                    <!-- <svg height="100" width="100">
+                        <path d="M 50 50 m -48, 0 a 48,48 0 1,1 96,0 a 48,48 0 1,1 -96,0" style="stroke: rgb(2, 253, 0); stroke-width: 4px; stroke-dasharray: 301.635223388672px, 301.635223388672px; stroke-dashoffset: 0px;">
+                            <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="10s" repeatCount="indefinite"></animateTransform>
+                            <animate></animate>
+                            <animate attributeType="CSS" attributeName="stroke-dashoffset" from="-301.6" to="301.6" dur="40s" repeatCount="indefinite" />
+                        </path>
+                    </svg> -->
+                </div>
+            </div>
+
+            <div id="push"></div>
+        </div>
+
+        <div id="footer" class="navbar navbar-default">
+            <div class="container">
+                <p class="navbar-text" id="posted">Loading...</p>
+                <p class="navbar-text nav navbar-nav navbar-right" id="categories">
+                    <span class="label label-default">Default</span>
+                    <span class="label label-primary">Primary</span>
+                    <span class="label label-success">Success</span>
+                    <span class="label label-warning">Warning</span>
+                    <span class="label label-danger">Danger</span>
+                    <span class="label label-info">Info</span>
+                </p>
+            </div>
+        </div>
+
+        <script src="static/js/jquery-2.1.1.min.js"></script>
+        <script src="static/js/bootstrap.min.js"></script>
+        <script src="static/js/main.js"></script>
+    </body>
+</html>
