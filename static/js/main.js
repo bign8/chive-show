@@ -218,15 +218,15 @@ Chive.viewer = function () {
 
         // Print Categories
         var cat, label, name, ele = $('#categories').empty();
-        for (var i in active.categories) {
-            cat = active.categories[i];
+        for (var i in active.tags) {
+            cat = active.tags[i];
             label = Chive.get_cat_label(cat);
             name = Chive.ucfirst(cat);
             ele.append('&nbsp;<span class="label label-' + label + '">' + name + '</span>');
         }
 
         // Date Published
-        var published = new Date(active.published);
+        var published = new Date(active.date);
         $('#posted').html('<small>' + Chive.date_format(published) + '</small>');
     }
 

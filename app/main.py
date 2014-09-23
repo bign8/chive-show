@@ -1,35 +1,45 @@
-from bottle import Bottle, static_file, redirect
-import chive
+# from cron import main
+from models import Post
+import bottle
+import random
 
-app = Bottle()
+bottle.DEBUG = True
+
+app = bottle.Bottle()
 
 
 # Static Router
 @app.route('/static/<filepath:path>')
 def server_static(filepath):
     """ Static file server """
-    return static_file(filepath, root='./static')
+    return bottle.static_file(filepath, root='./static')
 
 
 @app.route('/')
 def index():
-    return static_file('index.html', root='./static')
-    # TODO: remove this line and include (for reference)
-    redirect('/static/index.html')
+    return bottle.static_file('index.html', root='./static')
 
 
 @app.get('/api/data')
-def cron():
+def data():
     """ process new chive articles """
 
-    # TODO: Store in DB
     # TODO: mark content as viewed by this wb when sent full list
     # TODO: keep track of sessions / cookies
     # TODO: implement user preferences
+    # TODO: pretty print: https://pypi.python.org/pypi/bottle-api-json-formatting/0.1.1
 
-    # More tuned for cron, just a test
-    for feed in chive.next_page():
-        return feed.to_dict()
+    # Thanks: http://stackoverflow.com/a/21650400
+    query = Post.query()
+    all_keys = query.fetch(keys_only=True)
+    list_keys = random.sample(all_keys, 10)
+    return {'items': [key.get().to_dict() for key in list_keys]}
+
+
+# For development only
+# @app.get('/cron')
+# def cron():
+#     main()
 
 
 @app.get('/api/meta/<img>')
@@ -45,6 +55,6 @@ def error(err):
     return 'Your kung-fu is not strong'
 
 
-# Local develoment server (without GAE dev server)
+# NON-DB Development: Local develoment server (without GAE dev server)
 if __name__ == "__main__":
     app.run(host='localhost', port=8080, debug=True)

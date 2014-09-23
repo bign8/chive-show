@@ -2,9 +2,8 @@ from lxml import etree
 from urllib2 import urlopen
 import json
 import re
-
-
-title_dirty = re.compile(r'^[a-zA-Z0-9-]*$')
+# import datetime
+# import time
 
 
 class RSS:
@@ -43,9 +42,13 @@ class _rss_item:
         # Meta
         self.title = item.xpath('title/text()')[0]
         self.link = item.xpath('link/text()')[0]
-        self.published = item.xpath('pubDate/text()')[0]
-        self.categories = item.xpath('category/text()')
+        self.tags = item.xpath('category/text()')
         self.guid = item.xpath('guid/text()')[0]
+
+        # Date
+        self.date = item.xpath('pubDate/text()')[0] # Tue, 23 Sep 2014 01:00:01 +0000
+        # struct = time.strptime(date, '%a, %d %b %Y %H:%M:%S +0000')
+        # self.date = datetime.datetime(*struct, 0)
 
         # Creator
         self.creator = {
@@ -69,6 +72,8 @@ class _rss_item:
 
 
 class _rss_media:
+    dirty_title = re.compile(r'^[a-zA-Z0-9-]*$')
+
     def __init__(self, content):
         ns = {'namespaces': content.nsmap}
 
@@ -77,7 +82,7 @@ class _rss_media:
 
         # Category
         category = content.xpath('media:category/text()', **ns)
-        self.category = category[0] if category else None
+        self.category = category[0] if category else []
 
         # Rating
         rating = content.xpath('media:rating/text()', **ns)
@@ -85,11 +90,9 @@ class _rss_media:
 
         # Title
         title = content.xpath('media:title/text()', **ns)
-        # title = None if title_dirty.match(title) else title
-        # TODO: process title here (don't gather dumb ones)
         self.title = title[0] if title else None
 
-        if self.title and title_dirty.match(self.title):
+        if self.title and self.dirty_title.match(self.title):
             self.title = None
 
     def to_dict(self):

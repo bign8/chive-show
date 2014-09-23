@@ -1,0 +1,17 @@
+"""
+This file contains the data models for passing data too and from the datastore
+https://developers.google.com/appengine/docs/python/ndb/
+"""
+
+from google.appengine.ext import ndb
+
+
+# Cannot use keys: "key", "id", "parent", or "namespace"
+class Post(ndb.Model):
+    tags = ndb.StringProperty(repeated=True)
+    link = ndb.StringProperty()
+    date = ndb.StringProperty()
+    guid = ndb.StringProperty()
+    title = ndb.StringProperty()
+    media = ndb.JsonProperty()
+    creator = ndb.JsonProperty()

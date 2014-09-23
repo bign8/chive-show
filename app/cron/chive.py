@@ -10,7 +10,6 @@ def next_page():
 
     # Generate first feed
     FIRST = 'http://thechive.com/feed/?page'
-    FIRST = 'http://feeds.feedburner.com/thechive'  # used until datastore
     feed = RSS(FIRST)
     yield feed
 
