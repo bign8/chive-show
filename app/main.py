@@ -8,18 +8,6 @@ bottle.DEBUG = True
 app = bottle.Bottle()
 
 
-# Static Router
-@app.route('/static/<filepath:path>')
-def server_static(filepath):
-    """ Static file server """
-    return bottle.static_file(filepath, root='./static')
-
-
-@app.route('/')
-def index():
-    return bottle.static_file('index.html', root='./static')
-
-
 @app.get('/api/data')
 def data():
     """ process new chive articles """
@@ -53,8 +41,3 @@ def error(err):
     """ Display error message / hacker message """
     print str(err)
     return 'Your kung-fu is not strong'
-
-
-# NON-DB Development: Local develoment server (without GAE dev server)
-if __name__ == "__main__":
-    app.run(host='localhost', port=8080, debug=True)
