@@ -20,8 +20,10 @@ def data():
     # Thanks: http://stackoverflow.com/a/21650400
     query = Post.query()
     all_keys = query.fetch(keys_only=True)
+    if len(all_keys) < 10:
+        return {'status':'error', 'data': 'Basically empty datastore'}
     list_keys = random.sample(all_keys, 10)
-    return {'items': [key.get().to_dict() for key in list_keys]}
+    return {'status':'success','data': [key.get().to_dict() for key in list_keys]}
 
 
 # For development only
