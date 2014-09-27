@@ -1,6 +1,8 @@
 __author__ = 'bign8'
 
+import api
 import bottle
+import cron
 
 # Monkey-patching bottle to run in debug mode (better error messages)
 bottle.debug(True)
@@ -15,13 +17,11 @@ api = bottle.Bottle(autojson=True)
 
 @api.get('/api/data')
 def api_data():
-    from main import data
-    return data()
+    return api.data()
 
 @api.get('/api/meta/<img>')
 def api_meta(img=None):
-    from main import meta
-    return meta(img)
+    return api.meta(img)
 
 @api.error(404)
 def api_error(err):
@@ -39,8 +39,7 @@ cron = bottle.Bottle()
 
 @cron.get('/cron/parse_feeds')
 def cron_parse_feeds():
-    from cron import parse_feeds
-    return parse_feeds()
+    return cron.parse_feeds()
 
 
 # ERR call handlers

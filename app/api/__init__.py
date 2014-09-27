@@ -1,4 +1,4 @@
-from models import Post
+from app.models import Post
 import random
 
 
