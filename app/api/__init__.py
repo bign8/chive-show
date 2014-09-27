@@ -1,4 +1,4 @@
-from app.models import Post
+from app.models import Post, Img
 import random
 
 
@@ -15,8 +15,24 @@ def data():
     all_keys = query.fetch(keys_only=True)
     if len(all_keys) < 10:
         return {'status':'error', 'data': 'Basically empty datastore'}
+
+    # Get 10 random posts
     list_keys = random.sample(all_keys, 10)
-    return {'status':'success','data': [key.get().to_dict() for key in list_keys]}
+    posts = [key.get() for key in list_keys]
+
+    # Populate posts with images
+    for post in posts:
+        images = []
+        for key in post.keys:
+            img = key.get().to_dict()
+            images.append(img)
+        post.media = images
+
+    # Convert objects to dicts
+    exclude = ['keys']
+    data = [post.to_dict(exclude=exclude) for post in posts]
+
+    return {'status':'success','code':200,'data':data}
 
 
 def meta(img=None):

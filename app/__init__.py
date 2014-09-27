@@ -1,5 +1,3 @@
-__author__ = 'bign8'
-
 import api as _api
 import bottle
 import cron as _cron
