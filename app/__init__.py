@@ -26,7 +26,12 @@ def api_meta(img=None):
 @api.error(404)
 def api_error(err):
     print str(err)
-    return {'status':'error', 'code':404, 'data':'Endpoint not found'}
+    new_err = dict(status='error', code=404, data='Endpoint not found')
+
+    # PATCH: Bottle doen't return json correctly
+    from json import dumps
+    bottle.response.content_type = 'application/json'
+    return dumps(new_err)
 
 
 # CRON call handlers
