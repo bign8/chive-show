@@ -17,11 +17,14 @@ handlers:
   upload: static/index.html
 
 - url: /cron/.*
-  script: app.cron.cron
-  # login: admin
+  script: app.cron
+  login: admin
 
 - url: /api/.*
-  script: app.main.app
+  script: app.api
+
+- url: .*
+  script: app.err
 
 error_handlers:
   - file: err/default.html

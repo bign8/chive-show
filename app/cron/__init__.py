@@ -1,15 +1,8 @@
 import chive
 from app.models import Post
 
-import bottle
-
-bottle.DEBUG = True  # Monkey-patching
-
-cron = bottle.Bottle()
-
 # TODO: Check if posts are updated spairingly...
 
-@cron.get('/cron/parse_feeds')
 def parse_feeds():
     """ parse rss feeds into the datastore """
     page_count = 1
