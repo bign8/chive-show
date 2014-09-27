@@ -16,7 +16,11 @@ handlers:
   static_files: static/index.html
   upload: static/index.html
 
-- url: .*
+- url: /cron/.*
+  script: app.cron.cron
+  # login: admin
+
+- url: /api/.*
   script: app.main.app
 
 error_handlers:

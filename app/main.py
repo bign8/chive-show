@@ -1,11 +1,13 @@
-# from cron import main
 from models import Post
 import bottle
 import random
 
-bottle.DEBUG = True
+bottle.DEBUG = True  # Monkey-patching!!!
 
 app = bottle.Bottle()
+
+# API middleware
+# https://github.com/smthmlk/restware
 
 
 @app.get('/api/data')
@@ -24,12 +26,6 @@ def data():
         return {'status':'error', 'data': 'Basically empty datastore'}
     list_keys = random.sample(all_keys, 10)
     return {'status':'success','data': [key.get().to_dict() for key in list_keys]}
-
-
-# For development only
-# @app.get('/cron')
-# def cron():
-#     main()
 
 
 @app.get('/api/meta/<img>')
