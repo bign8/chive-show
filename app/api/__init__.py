@@ -47,3 +47,9 @@ def image_info(urlsafe=None):
         return img.to_dict()
     except:
         return {'status':'error','code':500,'data':'Cannot retrieve image'}
+
+def tags():
+    """ returns list of all tags """
+    tags_query = Post.query(projection=['tags'], distinct=True)
+    tags = [x.tags[0] for x in tags_query.fetch()]
+    return {'status':'success','code':200,'data':tags}

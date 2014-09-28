@@ -15,15 +15,20 @@ bottle.debug(True)
 # API call handlers
 api = bottle.Bottle(autojson=True)
 
-@api.get('/api/post/random')
-@api.get('/api/post/random/')
-@api.get('/api/post/random/<count:int>')
+@api.get('/api/v1/post/random')
+@api.get('/api/v1/post/random/')
+@api.get('/api/v1/post/random/<count:int>')
 def api_post_random(count=10):
     return _api.post_random(count)
 
-@api.get('/api/img/<urlsafe>')
+@api.get('/api/v1/img/<urlsafe>')
 def api_image_info(urlsafe=None):
     return _api.image_info(urlsafe)
+
+@api.get('/api/v1/tags')
+@api.get('/api/v1/tags/')
+def api_tags():
+    return _api.tags()
 
 @api.error(404)
 def api_error(err):

@@ -185,7 +185,7 @@ Chive.viewer = function () {
 
     // (Re)load list from server
     function load_list() {
-        return Chive.ajax.get('/api/post/random').then(function (res) {
+        return Chive.ajax.get('/api/v1/post/random').then(function (res) {
             if (res.status != 'success') throw Error(res.data);
             list = Chive.shuffle(res.data);
         });
