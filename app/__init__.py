@@ -2,7 +2,9 @@ import api as _api
 import bottle
 import cron as _cron
 
-# Monkey-patching bottle to run in debug mode (better error messages)
+# http://bottlepy.org/docs/dev/tutorial.html
+
+# Have bottle run in debug mode (better error messages)
 bottle.debug(True)
 
 
@@ -13,13 +15,15 @@ bottle.debug(True)
 # API call handlers
 api = bottle.Bottle(autojson=True)
 
-@api.get('/api/data')
-def api_data():
-    return _api.data()
+@api.get('/api/post/random')
+@api.get('/api/post/random/')
+@api.get('/api/post/random/<count:int>')
+def api_post_random(count=10):
+    return _api.post_random(count)
 
-@api.get('/api/meta/<img>')
-def api_meta(img=None):
-    return _api.meta(img)
+@api.get('/api/img/<urlsafe>')
+def api_image_info(urlsafe=None):
+    return _api.image_info(urlsafe)
 
 @api.error(404)
 def api_error(err):

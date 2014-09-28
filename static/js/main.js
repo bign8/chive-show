@@ -4,7 +4,7 @@
 // TODO: implement settings page / login / logout / app page (angular.js?)
 // TODO: local weather: http://erikflowers.github.io/weather-icons/
 // TODO: filter "best links of the internet" posts
-// TODO: disable next button while clicking next
+// TODO: disable next button while loading next
 // TODO: remove jquery: http://youmightnotneedjquery.com/
 
 /* Front End Documentation:
@@ -185,7 +185,7 @@ Chive.viewer = function () {
 
     // (Re)load list from server
     function load_list() {
-        return Chive.ajax.get('/api/data').then(function (res) {
+        return Chive.ajax.get('/api/post/random').then(function (res) {
             if (res.status != 'success') throw Error(res.data);
             list = Chive.shuffle(res.data);
         });
