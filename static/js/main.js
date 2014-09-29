@@ -229,6 +229,10 @@ Chive.viewer = function () {
         // Date Published
         var published = new Date(active.date);
         $('#posted').html('<small>' + Chive.date_format(published) + '</small>');
+
+        // Post author
+        var image = $('#timer_image #author')[0]
+        image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', active.creator.img)
     }
 
     // Change image in application

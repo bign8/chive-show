@@ -75,9 +75,6 @@ body {
 .frame.next .push {
     margin-bottom: -20px;
 }
-.frame.next .container {
-    text-align: right;
-}
 
 /* Show/Hide frames (fade) */
 .active {

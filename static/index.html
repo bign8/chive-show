@@ -12,35 +12,37 @@
     <body>
         <div id="wrap">
             <div class="navbar navbar-default">
-                <div class="navbar-header">
-                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-responsive-collapse">
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                    </button>
-                    <a class="navbar-brand" href="#">
-                        the<span style="color:#02fd00">C</span>hive show
-                        <!-- <img alt="theChive" src="static/img/chive-small.png" /> -->
-                    </a>
-                </div>
+                <div class="container">
+                    <div class="navbar-header">
+                        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-responsive-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </button>
+                        <a class="navbar-brand" href="#">
+                            the<span style="color:#02fd00">C</span>hive show
+                            <!-- <img alt="theChive" src="static/img/chive-small.png" /> -->
+                        </a>
+                    </div>
 
-                <div class="navbar-collapse collapse navbar-responsive-collapse">
-                    <p class="navbar-text" id="feed-title">Loading...</p>
+                    <div class="navbar-collapse collapse navbar-responsive-collapse">
+                        <p class="navbar-text" id="feed-title">Loading...</p>
 
-                    <!-- <ul class="nav navbar-nav navbar-right">
-                        <li>
-                            <button type="button" class="btn btn-sm btn-default navbar-btn">Sign in</button>
-                        </li>
-                        <li class="dropdown">
-                            <a href="#" class="dropdown-toggle" data-toggle="dropdown">John Doe <b class="caret"></b></a>
-                            <ul class="dropdown-menu">
-                                <li><a href="#">Favorites</a></li>
-                                <li><a href="#">Settings</a></li>
-                                <li class="divider"></li>
-                                <li><a href="#">Log out</a></li>
-                            </ul>
-                        </li>
-                    </ul> -->
+                        <!-- <ul class="nav navbar-nav navbar-right">
+                            <li>
+                                <button type="button" class="btn btn-sm btn-default navbar-btn">Sign in</button>
+                            </li>
+                            <li class="dropdown">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown">John Doe <b class="caret"></b></a>
+                                <ul class="dropdown-menu">
+                                    <li><a href="#">Favorites</a></li>
+                                    <li><a href="#">Settings</a></li>
+                                    <li class="divider"></li>
+                                    <li><a href="#">Log out</a></li>
+                                </ul>
+                            </li>
+                        </ul> -->
+                    </div>
                 </div>
             </div>
 
@@ -65,16 +67,21 @@
             <div class="next frame active">
                 <div class="push" style="margin-bottom:-20px"></div>
                 <div class="container">
-                    <button class="btn btn-sm btn-default" id="btn-next">
+                    <button class="btn btn-sm btn-default pull-right" id="btn-next">
                         <span class="glyphicon glyphicon-chevron-right"></span>
                     </button>
-                    <!-- <svg height="100" width="100">
+                    <svg id="timer_image" height="100" width="100" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="pull-left">
+                        <defs>
+                            <clipPath id="myClip">
+                                <circle cx="50" cy="50" r="46"/>
+                            </clipPath>
+                        </defs>
                         <path d="M 50 50 m -48, 0 a 48,48 0 1,1 96,0 a 48,48 0 1,1 -96,0" style="stroke: rgb(2, 253, 0); stroke-width: 4px; stroke-dasharray: 301.635223388672px, 301.635223388672px; stroke-dashoffset: 0px;">
-                            <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="10s" repeatCount="indefinite"></animateTransform>
-                            <animate></animate>
+                            <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="10s" repeatCount="indefinite" />
                             <animate attributeType="CSS" attributeName="stroke-dashoffset" from="-301.6" to="301.6" dur="40s" repeatCount="indefinite" />
                         </path>
-                    </svg> -->
+                        <image id="author" clip-path="url(#myClip)" x="4" y="4" width="92" height="92" xlink:href="data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=" />
+                    </svg>
                 </div>
             </div>
 
