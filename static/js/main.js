@@ -6,6 +6,7 @@
 // TODO: filter "best links of the internet" posts
 // TODO: disable next button while loading next
 // TODO: remove jquery: http://youmightnotneedjquery.com/
+// TODO: cache data locally
 
 /* Front End Documentation:
 http://bootswatch.com/cyborg/
@@ -23,6 +24,7 @@ Chive.loader = function () {
     var svg, path, anim, len;
 
     var load = function (settings) {
+        // TODO: generate svg from file + re-populate values (file or string)
 
         // TODO: provide defaults
         settings = settings || {};
@@ -69,9 +71,14 @@ Chive.loader = function () {
 
         // Append to document
         settings.parent.appendChild(svg);
-        return function (percent) {
-            // can pass in negative numbers to animate backwards
-            path.style.strokeDashoffset = len * (1 - percent);
+        return {
+            setPercent: function (percent) {
+                // can pass in negative numbers to animate backwards
+                path.style.strokeDashoffset = len * (1 - percent);
+            },
+            setImage: function (src) {
+                // TODO: set center image of timer
+            }
         };
     };
 
@@ -258,11 +265,20 @@ Chive.viewer = function () {
         var promise = fetch_image(item.url).then(function(image) {
             var frame = '#frame-1';
 
+            // TODO: do this in css: http://stackoverflow.com/questions/15300059/css-how-to-make-image-container-width-fixed-and-height-auto-stretched
+
             // Scale Image for height
             var height = $(document).height() - 105; // header + footer + 3
             if (image.height > height) {
                 image.width *= height / image.height;
                 image.height = height;
+            }
+
+            // Scale Image for width
+            var width = $(document).width() - 3;
+            if (image.width > width) {
+                image.height *= width / image.width;
+                image.width = height;
             }
 
             // Replace content of image
