@@ -1,3 +1,4 @@
+from google.appengine.ext import ndb
 from app.models import Post, Img
 import random
 
@@ -23,15 +24,19 @@ def post_random(count):
 
     # Get 10 random posts
     list_keys = random.sample(all_keys, count)
-    posts = [key.get() for key in list_keys]
+    posts = ndb.get_multi(list_keys)  # get all the keys at once
 
     # Populate posts with images
+    futures = []
     for post in posts:
-        images = []
-        for key in post.keys:
-            img = key.get().to_dict()
-            images.append(img)
+        images = ndb.get_multi_async(post.keys)
         post.media = images
+        futures.extend(images)
+
+    # Wait for async responses and cleanup
+    ndb.Future.wait_all(futures)
+    for post in posts:
+        post.media = [img.get_result().to_dict() for img in post.media]
 
     # Convert objects to dicts
     exclude = ['keys', 'urlsafe']
