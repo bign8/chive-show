@@ -6,7 +6,7 @@ https://cloud.google.com/appengine/docs/python/ndb/properties
 
 from google.appengine.ext import ndb
 
-class _DB_Helpers(ndb.Model):
+class DB_Model(ndb.Model):
 
     @classmethod
     def from_urlsafe(cls, urlsafe):
@@ -27,7 +27,7 @@ class _DB_Helpers(ndb.Model):
 
 
 # Cannot use keys: "key", "id", "parent", or "namespace"
-class Post(_DB_Helpers):
+class Post(DB_Model):
     tags = ndb.StringProperty(repeated=True)
     link = ndb.StringProperty()
     date = ndb.StringProperty()
@@ -38,7 +38,7 @@ class Post(_DB_Helpers):
     keys = ndb.KeyProperty(repeated=True)
 
 
-class Img(_DB_Helpers):
+class Img(DB_Model):
     url = ndb.StringProperty()  # also the ID
     title = ndb.TextProperty()
     rating = ndb.StringProperty()

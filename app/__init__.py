@@ -10,6 +10,7 @@ bottle.debug(True)
 
 # API middleware
 # https://github.com/smthmlk/restware
+# TODO: pretty print: https://pypi.python.org/pypi/bottle-api-json-formatting/0.1.1
 
 
 # API call handlers

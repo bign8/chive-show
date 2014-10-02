@@ -9,8 +9,6 @@ def post_random(count):
     # TODO: mark content as viewed by this wb when sent full list
     # TODO: keep track of sessions / cookies
     # TODO: implement user preferences
-    # TODO: pretty print: https://pypi.python.org/pypi/bottle-api-json-formatting/0.1.1
-    # TODO: Video: http://knowledge.kaltura.com/embedding-kaltura-media-players-your-site
 
     # Don't get massive amounts of random posts
     if count > 30:
@@ -26,17 +24,16 @@ def post_random(count):
     list_keys = random.sample(all_keys, count)
     posts = ndb.get_multi(list_keys)  # get all the keys at once
 
-    # Populate posts with images
-    futures = []
-    for post in posts:
-        images = ndb.get_multi_async(post.keys)
-        post.media = images
-        futures.extend(images)
+    # Flattem images and query them all at once
+    image_keys = [key for post in posts for key in post.keys]
+    images = ndb.get_multi(image_keys)  # get all images at once
 
-    # Wait for async responses and cleanup
-    ndb.Future.wait_all(futures)
+    # Re-populate posts with images
+    start = 0
     for post in posts:
-        post.media = [img.get_result().to_dict() for img in post.media]
+        end = start + len(post.keys)
+        post.media = [img.to_dict() for img in images[start:end]]
+        start = end
 
     # Convert objects to dicts
     exclude = ['keys', 'urlsafe']

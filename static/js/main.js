@@ -7,6 +7,7 @@
 // TODO: disable next button while loading next
 // TODO: remove jquery: http://youmightnotneedjquery.com/
 // TODO: cache data locally
+// TODO: Video: http://knowledge.kaltura.com/embedding-kaltura-media-players-your-site
 
 /* Front End Documentation:
 http://bootswatch.com/cyborg/
