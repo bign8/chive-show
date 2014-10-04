@@ -20,7 +20,7 @@ class DB_Model(ndb.Model):
 
     def to_dict(self, **args):
         """ Extend to_dict to append urlsafe key from db """
-        data = super(_DB_Helpers, self).to_dict(**args)
+        data = super(DB_Model, self).to_dict(**args)
         if 'urlsafe' not in args.get('exclude', []):
             data['urlsafe'] = self.key.urlsafe()
         return data
@@ -33,8 +33,9 @@ class Post(DB_Model):
     date = ndb.StringProperty()
     guid = ndb.StringProperty()  # also the ID
     title = ndb.StringProperty()
-    media = ndb.JsonProperty()
-    creator = ndb.JsonProperty()
+    media = ndb.JsonProperty()  # Depreciated
+    creator = ndb.JsonProperty()  # TODO: Depeciated
+    author = ndb.KeyProperty()
     keys = ndb.KeyProperty(repeated=True)
 
 
@@ -44,3 +45,8 @@ class Img(DB_Model):
     rating = ndb.StringProperty()
     category = ndb.StringProperty(repeated=True)
     is_valid = ndb.BooleanProperty(default=True)
+
+
+class Author(DB_Model):
+    name = ndb.StringProperty()
+    img = ndb.TextProperty()
