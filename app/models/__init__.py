@@ -26,17 +26,9 @@ class DB_Model(ndb.Model):
         return data
 
 
-# Cannot use keys: "key", "id", "parent", or "namespace"
-class Post(DB_Model):
-    tags = ndb.StringProperty(repeated=True)
-    link = ndb.StringProperty()
-    date = ndb.StringProperty()
-    guid = ndb.StringProperty()  # also the ID
-    title = ndb.StringProperty()
-    media = ndb.JsonProperty()  # Depreciated
-    creator = ndb.JsonProperty()  # TODO: Depeciated
-    author = ndb.KeyProperty()
-    keys = ndb.KeyProperty(repeated=True)
+class Tag(DB_Model):
+    tag = ndb.StringProperty()
+    color = ndb.StringProperty()
 
 
 class Img(DB_Model):
@@ -50,3 +42,16 @@ class Img(DB_Model):
 class Author(DB_Model):
     name = ndb.StringProperty()
     img = ndb.TextProperty()
+
+
+# Cannot use keys: "key", "id", "parent", or "namespace"
+class Post(DB_Model):
+    tags = ndb.StringProperty(repeated=True)
+    link = ndb.StringProperty()
+    date = ndb.StringProperty()
+    guid = ndb.StringProperty()  # also the ID
+    title = ndb.StringProperty()
+    media = ndb.JsonProperty()  # Depreciated
+    creator = ndb.JsonProperty()  # TODO: Depeciated
+    author = ndb.KeyProperty(kind=Author)
+    keys = ndb.KeyProperty(kind=Img, repeated=True)
