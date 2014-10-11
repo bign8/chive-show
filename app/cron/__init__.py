@@ -1,4 +1,5 @@
 import chive
+# from history import get_history
 from app.models import Post, Img
 from google.appengine.ext import ndb
 
@@ -8,13 +9,13 @@ from google.appengine.ext import ndb
 #       start processing history at last known search page (ignore hit_count)
 #       do all this while monitoring the time <= 60seconds
 
-def parse_feeds():
+def parse_feeds(start=0):
     """ parse rss feeds into the datastore """
     hit_count = 0
     page_count = 0
 
     # Loop over all the feeds
-    for feed in chive.next_page():
+    for feed in chive.next_page(start):
 
         page_count += 1
         hit_count += _process_items(feed)
@@ -22,6 +23,9 @@ def parse_feeds():
         # Kill if 5 collisions or 5 pages
         if hit_count >= 5 or page_count >= 5:
             break
+
+    # TODO: check this works
+    # get_history()
 
     return 'done'
 

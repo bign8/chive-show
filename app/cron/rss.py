@@ -7,8 +7,11 @@ import re
 
 
 class RSS:
-    def __init__(self, url):
-        """ Initialize rss feed """
+    def __init__(self, url, deep=True):
+        """
+        Initialize rss feed
+        :param deep: To store everything or just what's needed for searching
+        """
         stream = urlopen(url)
         tree = etree.parse(stream, etree.XMLParser(recover=True))
         root = tree.getroot()
@@ -22,7 +25,7 @@ class RSS:
         # Process Feed Items
         self.items = []
         for item in root.xpath('//channel/item'):
-            self.items.append(_rss_item(item))
+            self.items.append(_rss_item(item, deep))
 
         # Final attributes
         self.has_items = len(self.items) > 0
@@ -35,8 +38,11 @@ class RSS:
 
 
 class _rss_item:
-    def __init__(self, item):
-        """ Process feed item """
+    def __init__(self, item, deep=True):
+        """
+        Process feed item
+        :param deep: To store everything or just what's needed for searching
+        """
         ns = {'namespaces': item.nsmap}
 
         # Meta
@@ -57,13 +63,14 @@ class _rss_item:
         }
 
         # Content (append to creator)
-        self.media = []
-        for content in item.xpath("media:content[@medium='image']", **ns):
-            media = _rss_media(content)
-            if media.category and 'author' in media.category:
-                self.creator['img'] = media.url
-            else:
-                self.media.append(media)
+        if deep:
+            self.media = []
+            for content in item.xpath("media:content[@medium='image']", **ns):
+                media = _rss_media(content)
+                if media.category and 'author' in media.category:
+                    self.creator['img'] = media.url
+                else:
+                    self.media.append(media)
 
     def to_dict(self):
         dic = self.__dict__

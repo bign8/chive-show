@@ -19,7 +19,8 @@ api = bottle.Bottle(autojson=True)
 @api.get('/api/v1/post/random')
 @api.get('/api/v1/post/random/')
 @api.get('/api/v1/post/random/<count:int>')
-def api_post_random(count=10):
+def api_post_random(count=2):
+    # TODO: breaks javascript when 1
     return _api.post_random(count)
 
 @api.get('/api/v1/img/<urlsafe>')
