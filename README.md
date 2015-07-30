@@ -50,6 +50,8 @@ It would be nice if users could login and save preferences.  This will also trac
 ## Cloud Sourced Rating and Usability
 Allow users to up-vote certain images and create user specific experience.  Tags associated with an image can receive be voted upon. Use running mean to keep scores normalized and more lenient toward recent votes.  Votes can be stored individually and processed once a day.
 
+- [Running Average](https://en.wikipedia.org/wiki/Moving_average)
+
 ## Include Post Metadata + Dynamic Content
 Expand application support to also show Image descriptions when available.  The support of video content should also be enabled, but be able to be toggled via a user account setting or one of the options during the experience setup phase.
 

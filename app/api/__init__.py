@@ -9,6 +9,7 @@ def get_keys():
     # Thanks: http://stackoverflow.com/a/21650400
     # TODO: store random value with hashes + poll posts less than a random value (limit 10)
     query = Post.query()
+    # TODO store this list or count to memcache
     return query.fetch(keys_only=True)
 
 

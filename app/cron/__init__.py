@@ -8,6 +8,7 @@ from google.appengine.ext import ndb
 #       parse new posts until hit_count >= 5
 #       start processing history at last known search page (ignore hit_count)
 #       do all this while monitoring the time <= 60seconds
+# TODO: Use the new tags entity, limit tags based on https://en.wikipedia.org/wiki/Stop_words
 
 def parse_feeds(start=0):
     """ parse rss feeds into the datastore """
