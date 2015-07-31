@@ -7,16 +7,18 @@ import (
 
   "appengine"
   "appengine/datastore"
+
+  "github.com/mjibson/appstats"
 )
 
 func init() {
   http.HandleFunc("/", http.NotFound)  // Default Handler too
-  http.HandleFunc("/api/v1/post/random", random)
+  http.Handle("/api/v1/post/random", appstats.NewHandler(random))
   http.HandleFunc("/api/load", load)
 }
 
-func random(w http.ResponseWriter, r *http.Request) {
-  c := appengine.NewContext(r)
+func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+  // c := appengine.NewContext(r)
   w.Header().Set("Content-Type", "application/json")
 
   // Pull posts from datastore
@@ -30,27 +32,37 @@ func random(w http.ResponseWriter, r *http.Request) {
 
   // Convert posts to json and pull linked assets
   json_data := make([]JsonPost, len(data))
+  errc := make(chan error)
   for idx, item := range data {
-    imgs := make([]Img, len(item.Imgs))
-    err := datastore.GetMulti(c, item.Imgs, imgs)
-    if err != nil {
-      c.Errorf("datastore.GetMulti %v", err)
-      imgs = nil
-    }
-    var author Author
-    if err := json.Unmarshal(item.Creator, &author); err != nil {
-      c.Errorf("json.Unmarshal %v", err)
-      author = Author{Name:"Unknown", Img:"http://www.clker.com/cliparts/5/9/4/c/12198090531909861341man%20silhouette.svg.hi.png"}
-    }
-    json_data[idx] = JsonPost{
-      Tags: item.Tags,
-      Link: item.Link,
-      Date: item.Date,
-      Title: item.Title,
-      Author: author,
-      Imgs: imgs,
+    go func(idx int, item Post) {
+      imgs := make([]Img, len(item.Imgs))
+      err := datastore.GetMulti(c, item.Imgs, imgs)
+      if err != nil {
+        c.Errorf("datastore.GetMulti %v", err)
+        imgs = nil
+      }
+      var author Author
+      if err := json.Unmarshal(item.Creator, &author); err != nil {
+        c.Errorf("json.Unmarshal %v", err)
+        author = Author{Name:"Unknown", Img:"http://www.clker.com/cliparts/5/9/4/c/12198090531909861341man%20silhouette.svg.hi.png"}
+      }
+      json_data[idx] = JsonPost{
+        Tags: item.Tags,
+        Link: item.Link,
+        Date: item.Date,
+        Title: item.Title,
+        Author: author,
+        Imgs: imgs,
+      }
+      errc <- err
+    }(idx, item)
+  }
+  for item := range data {
+    if nil != <- errc {
+      c.Errorf("Error pulling json or linked assets %v", item)
     }
   }
+
   result := &JsonPostResponse{Status: "success", Code: 200, Data: json_data}
 
   str_items, err := json.MarshalIndent(result, "", "  ")
