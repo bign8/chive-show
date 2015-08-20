@@ -30,6 +30,10 @@ type Post struct {
   Guid    string           `datastore:"guid"`
 }
 
+type PostKeys struct {
+  Keys  []*datastore.Key
+}
+
 type JsonPostResponse struct {
   Status string     `json:"status"`
   Code   int        `json:"code"`

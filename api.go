@@ -3,7 +3,10 @@ package api
 import (
   "encoding/json"
   "fmt"
+  "math/rand"
   "net/http"
+  "net/url"
+  "strconv"
 
   "appengine"
   "appengine/datastore"
@@ -17,17 +20,65 @@ func init() {
   http.HandleFunc("/api/load", load)
 }
 
+func get_url_count(url *url.URL) int {
+  x := url.Query().Get("count")
+  if x == "" {
+    return 2
+  }
+  val, err := strconv.Atoi(x)
+  if err != nil || val > 30 || val < 1 {
+    return 2
+  }
+  return val
+}
+
+func getPostKeys(c appengine.Context) ([]*datastore.Key, error) {
+  // TODO: memcache too
+  var postKeys PostKeys
+  key := datastore.NewKey(c, "PostKeys", "1", 0, nil) // Note: will need to be deleted until cron is updated
+  err := datastore.Get(c, key, &postKeys)
+  if err == datastore.ErrNoSuchEntity {
+    err = nil
+    keys, err := datastore.NewQuery("Post").KeysOnly().GetAll(c, nil)
+    if err != nil {
+      return nil, err
+    }
+    postKeys.Keys = keys
+    _, err = datastore.Put(c, key, &postKeys)
+  }
+  return postKeys.Keys, err
+}
+
 func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
-  // c := appengine.NewContext(r)
   w.Header().Set("Content-Type", "application/json")
+  count := get_url_count(r.URL)
+  c.Infof("request %v", count)
+
+  // Pull keys from post keys object
+  keys, err := getPostKeys(c)
+  if err != nil {
+    c.Errorf("datastore.NewQuery %v", err)
+    fmt.Fprint(w, "{\"status\":\"error\",\"code\":500,\"data\":null}")
+    return
+  }
+  if len(keys) < count {
+    c.Errorf("Not enough keys(%v) for count(%v)", len(keys), count)
+    fmt.Fprint(w, "{\"status\":\"error\",\"code\":500,\"data\":\"Basically empty datastore\"}")
+    return
+  }
+
+  // Randomize list of keys
+  for i := range keys {
+    j := rand.Intn(i + 1)
+    keys[i], keys[j] = keys[j], keys[i]
+  }
 
   // Pull posts from datastore
-  var data []Post
-  q := datastore.NewQuery("Post").Limit(5)
-  if _, err := q.GetAll(c, &data); err != nil {
-      c.Errorf("datastore.NewQuery %v", err)
-      fmt.Fprint(w, "{\"status\":\"error\",\"code\":500,\"data\":null}")
-      return
+  data := make([]Post, count)
+  if err := datastore.GetMulti(c, keys[:count], data); err != nil {
+    c.Errorf("datastore.NewQuery %v", err)
+    fmt.Fprint(w, "{\"status\":\"error\",\"code\":500,\"data\":null}")
+    return
   }
 
   // Convert posts to json and pull linked assets
