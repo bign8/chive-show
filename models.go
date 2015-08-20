@@ -31,7 +31,12 @@ type Post struct {
 }
 
 type PostKeys struct {
-  Keys  []*datastore.Key
+  Keys  []PostKey
+}
+
+type PostKey struct {
+  StringID  string
+  IntID     int64
 }
 
 type JsonPostResponse struct {

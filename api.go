@@ -7,9 +7,11 @@ import (
   "net/http"
   "net/url"
   "strconv"
+  "time"
 
   "appengine"
   "appengine/datastore"
+  "appengine/memcache"
 
   "github.com/mjibson/appstats"
 )
@@ -32,27 +34,80 @@ func get_url_count(url *url.URL) int {
   return val
 }
 
-func getPostKeys(c appengine.Context) ([]*datastore.Key, error) {
-  // TODO: memcache too
+func getPostKeys(c appengine.Context) ([]PostKey, error) {
   var postKeys PostKeys
-  key := datastore.NewKey(c, "PostKeys", "1", 0, nil) // Note: will need to be deleted until cron is updated
-  err := datastore.Get(c, key, &postKeys)
-  if err == datastore.ErrNoSuchEntity {
-    err = nil
-    keys, err := datastore.NewQuery("Post").KeysOnly().GetAll(c, nil)
-    if err != nil {
-      return nil, err
-    }
-    postKeys.Keys = keys
-    _, err = datastore.Put(c, key, &postKeys)
+
+  // Check Memcache
+  start := time.Now()
+  cacheItem, err := memcache.Get(c, "PostKeys")
+  c.Infof("Actual memcache Get Duration %v", time.Since(start).String())
+  if err != nil && err != memcache.ErrCacheMiss {
+    return nil, err
   }
+  if err == nil {
+
+    // Memcache HIT
+    c.Infof("Memcache HIT")
+    start := time.Now()
+    err = json.Unmarshal(cacheItem.Value, &postKeys)
+    c.Infof("JSON Unmarshal Duration %v", time.Since(start).String())
+
+  } else {
+
+    // Memcache MISS
+    c.Infof("Memcache MISS")
+    key := datastore.NewKey(c, "PostKeys", "1", 0, nil) // Note: will need to be deleted until cron is updated
+    start := time.Now()
+    err = datastore.Get(c, key, &postKeys)
+    c.Infof("Actual DB Get Duration %v", time.Since(start).String())
+
+    // Datastore MISS
+    if err == datastore.ErrNoSuchEntity {
+      c.Infof("Datastore MISS")
+      err = nil
+      keys, err := datastore.NewQuery("Post").KeysOnly().GetAll(c, nil)
+      if err != nil {
+        return nil, err
+      }
+      postKeys.Keys = make([]PostKey, len(keys))
+      for idx, item := range keys {
+        postKeys.Keys[idx] = dbKeyToPostKey(item)
+      }
+      c.Infof("key %v", key)
+      _, err = datastore.Put(c, key, &postKeys)
+      c.Infof("err %v", err)
+    }
+
+    // Fork setting memcache so other things can run
+    go func() {
+      b, err := json.Marshal(postKeys)
+      if err == nil {
+        err = memcache.Set(c, &memcache.Item{
+          Key:   "PostKeys",
+          Value: b,
+        })
+      }
+    }()
+  }
+
   return postKeys.Keys, err
+}
+
+func dbKeyToPostKey(k *datastore.Key) PostKey {
+  return PostKey{
+    StringID:  k.StringID(),
+    IntID:     k.IntID(),
+  }
+}
+
+func postKeyToDBKey(c appengine.Context, k PostKey) *datastore.Key {
+  return datastore.NewKey(c, "Post", k.StringID, k.IntID, nil)
 }
 
 func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
   w.Header().Set("Content-Type", "application/json")
   count := get_url_count(r.URL)
-  c.Infof("request %v", count)
+  c.Infof("Requested %v random posts", count)
 
   // Pull keys from post keys object
   keys, err := getPostKeys(c)
@@ -72,10 +127,17 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
     j := rand.Intn(i + 1)
     keys[i], keys[j] = keys[j], keys[i]
   }
+  keys = keys[:count]
+
+  // Convert PostKey to real datastore.Key
+  realKeys := make([]*datastore.Key, count)
+  for idx, key := range keys {
+    realKeys[idx] = postKeyToDBKey(c, key)
+  }
 
   // Pull posts from datastore
   data := make([]Post, count)
-  if err := datastore.GetMulti(c, keys[:count], data); err != nil {
+  if err := datastore.GetMulti(c, realKeys, data); err != nil {
     c.Errorf("datastore.NewQuery %v", err)
     fmt.Fprint(w, "{\"status\":\"error\",\"code\":500,\"data\":null}")
     return
