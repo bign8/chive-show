@@ -30,15 +30,6 @@ type Post struct {
   Guid    string           `datastore:"guid"`
 }
 
-type PostKeys struct {
-  Keys  []PostKey
-}
-
-type PostKey struct {
-  StringID  string
-  IntID     int64
-}
-
 type JsonPostResponse struct {
   Status string     `json:"status"`
   Code   int        `json:"code"`
