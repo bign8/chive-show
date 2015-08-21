@@ -57,4 +57,5 @@ type JsonPostResponse struct {
   Status string     `json:"status"`
   Code   int        `json:"code"`
   Data   []Post     `json:"data"`
+  Msg    string     `json:"msg"`
 }

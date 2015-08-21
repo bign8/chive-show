@@ -20,6 +20,11 @@ func init() {
   http.HandleFunc("/", http.NotFound)  // Default Handler too
   http.Handle("/api/v1/post/random", appstats.NewHandler(random))
   http.HandleFunc("/api/load", load)
+  http.HandleFunc("/cron/parse_feeds", parseFeeds)
+}
+
+func parseFeeds(w http.ResponseWriter, r *http.Request) {
+  fmt.Fprint(w, "Here is your cron")
 }
 
 func get_url_count(url *url.URL) int {
@@ -39,49 +44,58 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
   count := get_url_count(r.URL)
   c.Infof("Requested %v random posts", count)
 
+  result := JsonPostResponse{
+    Status: "error",
+    Code:   500,
+  }
+
   // Pull keys from post keys object
   keys, err := helpers.GetKeys(c, "Post")
   if err != nil {
-    c.Errorf("datastore.NewQuery %v", err)
-    fmt.Fprint(w, "{\"status\":\"error\",\"code\":500,\"data\":null}")
-    return
-  }
-  if len(keys) < count {
+
+    c.Errorf("heleprs.GetKeys %v", err)
+    result.Msg = "Error with helpers GetKeys"
+
+  } else if len(keys) < count {
+
     c.Errorf("Not enough keys(%v) for count(%v)", len(keys), count)
-    fmt.Fprint(w, "{\"status\":\"error\",\"code\":500,\"data\":\"Basically empty datastore\"}")
-    return
-  }
+    result.Msg = "Basically empty datastore"
 
-  // Randomize list of keys
-  for i := range keys {
-    j := rand.Intn(i + 1)
-    keys[i], keys[j] = keys[j], keys[i]
-  }
-  realKeys := keys[:count]
+  } else {
 
-  // Pull posts from datastore
-  data := make([]Post, count)
-  if err := datastore.GetMulti(c, realKeys, data); err != nil {
-    c.Errorf("datastore.NewQuery %v", err)
-    fmt.Fprint(w, "{\"status\":\"error\",\"code\":500,\"data\":null}")
-    return
-  }
+    // Randomize list of keys
+    for i := range keys {
+      j := rand.Intn(i + 1)
+      keys[i], keys[j] = keys[j], keys[i]
+    }
 
-  // Generate JsonPostResponse object
-  result := &JsonPostResponse{
-    Status: "success",
-    Code: 200,
-    Data: data,
+    // Pull posts from datastore
+    data := make([]Post, count)
+    if err := datastore.GetMulti(c, keys[:count], data); err != nil {
+
+      c.Errorf("datastore.GetMulti %v", err)
+      result.Msg = "Error with datastore GetMulti"
+
+    } else {
+
+      // Generate JsonPostResponse object
+      result.Status = "success"
+      result.Code = 200
+      result.Msg = "Your amazing data awaits"
+      result.Data = data
+    }
   }
 
   // Serialize and send response
-  str_items, err := json.MarshalIndent(result, "", "  ")
+  str_items, err := json.MarshalIndent(&result, "", "  ")
+  var out string
   if err != nil {
     c.Errorf("json.MarshalIndent %v", err)
-    fmt.Fprint(w, "{\"status\":\"error\",\"code\":500,\"data\":null}")
-    return
+    out = "{\"status\":\"error\",\"code\":500,\"data\":null,\"msg\":\"Error marshaling data\"}"
+  } else {
+    out = string(str_items)
   }
-  fmt.Fprint(w, string(str_items))
+  fmt.Fprint(w, out)
 }
 
 func load(w http.ResponseWriter, r *http.Request) {
