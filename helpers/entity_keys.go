@@ -1,11 +1,11 @@
 package helpers
 
 import (
-  "encoding/json"
-
   "appengine"
   "appengine/datastore"
   "appengine/memcache"
+  "encoding/json"
+  "time"
 )
 
 type entityKeys struct {
@@ -43,7 +43,10 @@ func GetKeys(c appengine.Context, name string) ([]*datastore.Key, error) {
   var postKeys entityKeys
 
   // Check Memcache
+  start := time.Now()
   cacheItem, err := memcache.Get(c, mc(name))
+  c.Infof("Actual Memcache.Get: %v", time.Since(start).String())
+
   if err != nil && err != memcache.ErrCacheMiss {
     return nil, err
   }
@@ -51,14 +54,19 @@ func GetKeys(c appengine.Context, name string) ([]*datastore.Key, error) {
 
     // Memcache HIT
     c.Infof("Memcache HIT")
+    start := time.Now()
     err = json.Unmarshal(cacheItem.Value, &postKeys)
+    c.Infof("Actual json.Unmarshal: %v", time.Since(start).String())
 
   } else {
 
     // Memcache MISS
     c.Infof("Memcache MISS")
     key := datastore.NewKey(c, keyStorageKind, name, 0, nil) // Note: will need to be deleted until cron is updated
+
+    start := time.Now()
     err = datastore.Get(c, key, &postKeys)
+    c.Infof("Actual Datastore.Get: %v", time.Since(start).String())
 
     // Datastore MISS
     if err == datastore.ErrNoSuchEntity {

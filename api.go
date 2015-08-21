@@ -67,41 +67,14 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
     return
   }
 
-  // Convert posts to json and pull linked assets
-  json_data := make([]JsonPost, len(data))
-  errc := make(chan error)
-  for idx, item := range data {
-    go func(idx int, item Post) {
-      imgs := make([]Img, len(item.Imgs))
-      err := datastore.GetMulti(c, item.Imgs, imgs)
-      if err != nil {
-        c.Errorf("datastore.GetMulti %v", err)
-        imgs = nil
-      }
-      var author Author
-      if err := json.Unmarshal(item.Creator, &author); err != nil {
-        c.Errorf("json.Unmarshal %v", err)
-        author = Author{Name:"Unknown", Img:"http://www.clker.com/cliparts/5/9/4/c/12198090531909861341man%20silhouette.svg.hi.png"}
-      }
-      json_data[idx] = JsonPost{
-        Tags: item.Tags,
-        Link: item.Link,
-        Date: item.Date,
-        Title: item.Title,
-        Author: author,
-        Imgs: imgs,
-      }
-      errc <- err
-    }(idx, item)
-  }
-  for item := range data {
-    if nil != <- errc {
-      c.Errorf("Error pulling json or linked assets %v", item)
-    }
+  // Generate JsonPostResponse object
+  result := &JsonPostResponse{
+    Status: "success",
+    Code: 200,
+    Data: data,
   }
 
-  result := &JsonPostResponse{Status: "success", Code: 200, Data: json_data}
-
+  // Serialize and send response
   str_items, err := json.MarshalIndent(result, "", "  ")
   if err != nil {
     c.Errorf("json.MarshalIndent %v", err)
@@ -115,16 +88,20 @@ func load(w http.ResponseWriter, r *http.Request) {
   c := appengine.NewContext(r)
   inno_key := datastore.NewIncompleteKey(c, "Post", nil)
 
-  img_key_1, err := datastore.Put(c,
-    datastore.NewIncompleteKey(c, "Img", nil),
-    &Img{
-      Url: "https://thechive.files.wordpress.com/2015/02/in-case-you-missed-them-check-out-the-top-posts-of-the-week-10-photos-10.jpg",
-      Title: "\u201cI swear doc, I don\u2019t know how it got there\u201d",
-      IsValid: true,
-    },
-  )
+  image := Img{
+    Url: "https://thechive.files.wordpress.com/2015/02/in-case-you-missed-them-check-out-the-top-posts-of-the-week-10-photos-10.jpg",
+    Title: "\u201cI swear doc, I don\u2019t know how it got there\u201d",
+    IsValid: true,
+  }
+
+  img_key_1, err := datastore.Put(c, datastore.NewIncompleteKey(c, "Img", nil), &image)
   if err != nil {
     fmt.Print(w, "Error with img_key_1")
+  }
+
+  b, err := json.Marshal([]Img{image, image})
+  if err != nil {
+    fmt.Print(w, "Error with Marshaling")
   }
 
   obj := &Post{
@@ -137,6 +114,7 @@ func load(w http.ResponseWriter, r *http.Request) {
     Imgs: []*datastore.Key{
       img_key_1,
     },
+    Media: b,
   }
   _, err = datastore.Put(c, inno_key, obj)
   if err != nil {
