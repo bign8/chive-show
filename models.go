@@ -1,9 +1,6 @@
-package api
+package main
 
-import (
-  "appengine/datastore"
-  "encoding/json"
-)
+import "appengine/datastore"
 
 type Author struct {
   Name string `datastore:"name" json:"name"`
@@ -11,46 +8,29 @@ type Author struct {
 }
 
 type Img struct {
-  Url      string `datastore:"url"      json:"url"`
-  Title    string `datastore:"title"    json:"title"`
-  IsValid  bool   `datastore:"is_valid" json:"-"`
-  Rating   string `datastore:"rating"   json:"-"`
+  Url      string `datastore:"url"      json:"url"    xml:"url,attr"`
+  Title    string `datastore:"title"    json:"title"  xml:"title"`
+  IsValid  bool   `datastore:"is_valid" json:"-"      xml:"-"`
+  Rating   string `datastore:"rating"   json:"-"      xml:"rating"`
+  Category string `datastore:"-"        json:"-"      xml:"category"`
 }
 
 type Post struct {
-  Tags      []string         `datastore:"tags"    json:"tags"`
-  Link      string           `datastore:"link"    json:"link"`
-  Date      string           `datastore:"date"    json:"date"`
-  Title     string           `datastore:"title"   json:"title"`
+  Tags      []string         `datastore:"tags"    json:"tags"    xml:"category"`
+  Link      string           `datastore:"link"    json:"link"    xml:"link"`
+  Date      string           `datastore:"date"    json:"date"    xml:"pubDate"`
+  Title     string           `datastore:"title"   json:"title"   xml:"title"`
 
-  Author    *datastore.Key   `datastore:"author"  json:"-"`
-  Imgs      []*datastore.Key `datastore:"keys"    json:"-"`
-  Media     []byte           `datastore:"media"   json:"-"`
-  Creator   []byte           `datastore:"creator" json:"-"`
-  Guid      string           `datastore:"guid"    json:"-"`
+  Author    *datastore.Key   `datastore:"author"  json:"-"       xml:"-"`
+  Imgs      []*datastore.Key `datastore:"keys"    json:"-"       xml:"-"`
+  Media     []byte           `datastore:"media"   json:"-"       xml:"-"`
+  Creator   []byte           `datastore:"creator" json:"-"       xml:"-"`
+  Guid      string           `datastore:"guid"    json:"-"       xml:"guid"`
 
-  JsCreator Author           `datastore:"-"       json:"creator"`
-  JsImgs    []Img            `datastore:"-"       json:"media"`
-}
+  JsCreator Author           `datastore:"-"       json:"creator" xml:"-"`
+  JsImgs    []Img            `datastore:"-"       json:"media"   xml:"content"`
 
-func (x *Post) Load(c <-chan datastore.Property) error {
-    if err := datastore.LoadStruct(x, c); err != nil {
-        return err
-    }
-    // Load Author
-    if json.Unmarshal(x.Creator, &x.JsCreator) != nil {
-      x.JsCreator = Author{
-        Name: "Unknown",
-        Img: "http://www.clker.com/cliparts/5/9/4/c/12198090531909861341man%20silhouette.svg.hi.png",
-      }
-    }
-    // Load Images/Media
-    return json.Unmarshal(x.Media, &x.JsImgs)
-}
-
-func (x *Post) Save(c chan<- datastore.Property) error {
-    // defer close(c)
-    return datastore.SaveStruct(x, c)
+  StrAuthor string           `datastore:"-"       json:"-"       xml:"creator"`
 }
 
 type JsonPostResponse struct {

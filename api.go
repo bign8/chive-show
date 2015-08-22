@@ -1,4 +1,4 @@
-package api
+package main
 
 import (
   "encoding/json"
@@ -16,17 +16,33 @@ import (
   "github.com/mjibson/appstats"
 )
 
-func init() {
-  http.HandleFunc("/", http.NotFound)  // Default Handler too
+func api() {
   http.Handle("/api/v1/post/random", appstats.NewHandler(random))
   http.HandleFunc("/api/load", load)
-  http.HandleFunc("/cron/parse_feeds", parseFeeds)
 }
 
-func parseFeeds(w http.ResponseWriter, r *http.Request) {
-  fmt.Fprint(w, "Here is your cron")
+// Datastore LoadSaveProperty Interface
+func (x *Post) Load(c <-chan datastore.Property) error {
+    if err := datastore.LoadStruct(x, c); err != nil {
+        return err
+    }
+    // Load Author
+    if json.Unmarshal(x.Creator, &x.JsCreator) != nil {
+      x.JsCreator = Author{
+        Name: "Unknown",
+        Img: "http://www.clker.com/cliparts/5/9/4/c/12198090531909861341man%20silhouette.svg.hi.png",
+      }
+    }
+    // Load Images/Media
+    return json.Unmarshal(x.Media, &x.JsImgs)
 }
 
+func (x *Post) Save(c chan<- datastore.Property) error {
+    // defer close(c)
+    return datastore.SaveStruct(x, c)
+}
+
+// API Helper function
 func get_url_count(url *url.URL) int {
   x := url.Query().Get("count")
   if x == "" {
@@ -39,6 +55,7 @@ func get_url_count(url *url.URL) int {
   return val
 }
 
+// Actual PI functions
 func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
   w.Header().Set("Content-Type", "application/json")
   count := get_url_count(r.URL)
