@@ -33,7 +33,7 @@ func GetKeys(c appengine.Context, name string) ([]*datastore.Key, error) {
   // Check Memcache
   start := time.Now()
   _, err := memcache.Gob.Get(c, mcKey(name), &postKeys)
-  c.Infof("Actual Memcache.Get: %v", time.Since(start).String())
+  c.Infof("Actual Memcache.Get: %s", time.Since(start))
 
   if err != nil {
     if err != memcache.ErrCacheMiss {
@@ -43,7 +43,7 @@ func GetKeys(c appengine.Context, name string) ([]*datastore.Key, error) {
     key := datastore.NewKey(c, keyStorageKind, name, 0, nil)
     start := time.Now()
     err = datastore.Get(c, key, &postKeys)
-    c.Infof("Actual Datastore.Get: %v", time.Since(start).String())
+    c.Infof("Actual Datastore.Get: %s", time.Since(start))
 
     // Datastore MISS
     if err == datastore.ErrNoSuchEntity {  // FYI: this is a costly operation

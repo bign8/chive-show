@@ -1,27 +1,25 @@
 package main
 
 import (
-  // "encoding/json"
-  "fmt"
-  // "math/rand"
-  "net/http"
-  // "net/url"
-  // "strconv"
-  //
-  // "helpers"
-  //
   "appengine"
   "appengine/urlfetch"
   "encoding/xml"
   "encoding/json"
-  "errors"
+  "fmt"
+  "net/http"
+  // "encoding/json"
+  // "math/rand"
+  // "net/url"
+  // "strconv"
+  // "helpers"
   // "appengine/datastore"
-
 )
 
 func cron() {
   http.HandleFunc("/cron/parse_feeds", parseFeeds)
 }
+
+var FeedParse404Error error = fmt.Errorf("Feed parcing recieved a %d Status Code", 404)
 
 func page_url(idx int) string {
   if idx > 0 {
@@ -39,7 +37,6 @@ func parseFeeds(w http.ResponseWriter, r *http.Request) {
   c := appengine.NewContext(r)
   fp := new(FeedParser)
   fp.Main(c, w)
-  c.Infof("TODO: %v", fp.todo)
 }
 
 type FeedParser struct {
@@ -59,23 +56,36 @@ func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
     return err
   }
   err = x.Search(1, -1)
-  if err != nil {
-    for _, idx := range x.todo {
-      go x.pullNstore(idx)
-    }
-    // TODO: process x.todo
+  if err == nil {
+    err = x.processTodo()
   }
   return err
 }
 
-func (x *FeedParser) pullNstore(idx int) (err error) {
-  url := page_url(idx - 1)
-  resp, err := x.client.Get(url)
-  if err != nil {
-    return err
+func (x *FeedParser) processTodo() error {
+  x.context.Infof("Processing TODO: %v", x.todo)
+  done := make(chan error)
+  for _, idx := range x.todo {
+    go func (idx int) {
+      posts, err := x.getAndParseFeed(idx)
+      if err == nil {
+        for _, post := range posts {
+          err = x.storePost(post)
+          if err != nil {
+            break
+          }
+        }
+      }
+      done <- err
+    }(idx)
   }
-  // TODO: process and store feed here
-  x.context.Infof("Content of %v: %v", url, resp)
+  for i := 0; i < len(x.todo); i++ {
+    err := <-done
+    if err != nil {
+      x.context.Errorf("error storing feed (at index %d): %v", i, err)
+      return err
+    }
+  }
   return nil
 }
 
@@ -121,48 +131,46 @@ func (x *FeedParser) Search(bottom, top int) (err error) {
 }
 
 func (x *FeedParser) isStop(idx int) (is_stop, full_stop bool, err error) {
-  url := page_url(idx - 1)
-  resp, err := x.client.Get(url)
-  if err != nil {
-    x.context.Errorf("Error retrieving \"%v\": %v", url, err)
-    return false, false, err
-  }
-  defer resp.Body.Close()
-  if resp.StatusCode == 404 {
-    x.context.Infof(" the end of the feed list %v (%v)", )
+  // Gather posts as necessary
+  posts, err := x.getAndParseFeed(idx)
+  if err == FeedParse404Error {
+    x.context.Infof("Reached the end of the feed list (%v)", idx)
     return true, false, nil
   }
-  if resp.StatusCode != 200 {
-    return false, false, errors.New("Recieved non-200/404 error code")
-  }
-
-  // Convert the xml to struct
-  posts, err := parseFeedResponse(resp)
   if err != nil {
     x.context.Errorf("Error decoding ChiveFeed: %s", err)
     return false, false, err
   }
 
+  // DEBUG ONLY
   data, err := json.MarshalIndent(posts, "", " ")
   fmt.Fprint(x.writer, string(data))
 
   // Actually loading up
-  x.context.Infof("Loading index %v %v", idx, url)
   top := 1
   return idx > top, idx == top, nil
-
-  // // TODO: process feed here, store if necessary
-  // // full_stop is if this is the final collision (ie, some new posts, but not all)
-  // x.context.Infof("Content of %v: %v", url, resp)
-  // return false, false
 }
 
-func parseFeedResponse(resp *http.Response) ([]Post, error) {
+func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
+  url := page_url(idx - 1)
+
+  // Get Response
+  x.context.Infof("Parsing index %v (%v)", idx, url)
+  resp, err := x.client.Get(url)
+  defer resp.Body.Close()
+  if err != nil || resp.StatusCode != 200 {
+    if resp.StatusCode == 404 {
+      return nil, FeedParse404Error
+    }
+    return nil, fmt.Errorf("Feed parcing recieved a %d Status Code", resp.StatusCode)
+  }
+
   // Decode Response
   decoder := xml.NewDecoder(resp.Body)
-  var feed ChiveFeed
-  err := decoder.Decode(&feed)
-  if err != nil {
+  var feed struct {
+    Items []Post `xml:"channel>item"`
+  }
+  if decoder.Decode(&feed) != nil {
     return nil, err
   }
 
@@ -178,8 +186,9 @@ func parseFeedResponse(resp *http.Response) ([]Post, error) {
   return feed.Items, err
 }
 
-type ChiveFeed struct {
-  Items []Post `xml:"channel>item"`
+func (x *FeedParser) storePost(p Post) error {
+  // TODO: database store post
+  return nil
 }
 
 /*
