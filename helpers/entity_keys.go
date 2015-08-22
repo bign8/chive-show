@@ -4,7 +4,6 @@ import (
   "appengine"
   "appengine/datastore"
   "appengine/memcache"
-  "encoding/json"
   "time"
 )
 
@@ -20,22 +19,11 @@ type entityKey struct {
 
 const (
   defaultTimeout   = 20
-  keyStorageKind  = "GeneralKeysOptimal"
+  keyStorageKind  = "DatastoreKeysCache"
 )
 
-func mc(name string) string {
+func mcKey(name string) string {
   return keyStorageKind + ":" + name
-}
-
-func dbKeyToPostKey(k *datastore.Key) entityKey {
-  return entityKey{
-    StringID:  k.StringID(),
-    IntID:     k.IntID(),
-  }
-}
-
-func postKeyToDBKey(c appengine.Context, name string, k entityKey) *datastore.Key {
-  return datastore.NewKey(c, name, k.StringID, k.IntID, nil)
 }
 
 // Count retrieves the value of the named counter.
@@ -44,33 +32,22 @@ func GetKeys(c appengine.Context, name string) ([]*datastore.Key, error) {
 
   // Check Memcache
   start := time.Now()
-  cacheItem, err := memcache.Get(c, mc(name))
+  _, err := memcache.Gob.Get(c, mcKey(name), &postKeys)
   c.Infof("Actual Memcache.Get: %v", time.Since(start).String())
 
-  if err != nil && err != memcache.ErrCacheMiss {
-    return nil, err
-  }
-  if err == nil {
+  if err != nil {
+    if err != memcache.ErrCacheMiss {
+      return nil, err
+    }
 
-    // Memcache HIT
-    c.Infof("Memcache HIT")
-    start := time.Now()
-    err = json.Unmarshal(cacheItem.Value, &postKeys)
-    c.Infof("Actual json.Unmarshal: %v", time.Since(start).String())
-
-  } else {
-
-    // Memcache MISS
-    c.Infof("Memcache MISS")
-    key := datastore.NewKey(c, keyStorageKind, name, 0, nil) // Note: will need to be deleted until cron is updated
-
+    key := datastore.NewKey(c, keyStorageKind, name, 0, nil)
     start := time.Now()
     err = datastore.Get(c, key, &postKeys)
     c.Infof("Actual Datastore.Get: %v", time.Since(start).String())
 
     // Datastore MISS
-    if err == datastore.ErrNoSuchEntity {
-      c.Infof("Datastore MISS")
+    if err == datastore.ErrNoSuchEntity {  // FYI: this is a costly operation
+      c.Infof("Datastore MISS: Costly Query getting keys over \"%v\"", name)
       err = nil
       keys, err := datastore.NewQuery(name).KeysOnly().GetAll(c, nil)
       if err != nil {
@@ -78,29 +55,27 @@ func GetKeys(c appengine.Context, name string) ([]*datastore.Key, error) {
       }
       postKeys.Keys = make([]entityKey, len(keys))
       for idx, item := range keys {
-        postKeys.Keys[idx] = dbKeyToPostKey(item)
+        postKeys.Keys[idx] = entityKey{
+          StringID:  item.StringID(),
+          IntID:     item.IntID(),
+        }
       }
-      c.Infof("key %v", key)
       _, err = datastore.Put(c, key, &postKeys)
-      c.Infof("err %v", err)
     }
 
     // Fork setting memcache so other things can run
     go func() {
-      b, err := json.Marshal(postKeys)
-      if err == nil {
-        err = memcache.Set(c, &memcache.Item{
-          Key:   mc(name),
-          Value: b,
-        })
-      }
+      err = memcache.Gob.Set(c, &memcache.Item{
+        Key:   mcKey(name),
+        Object: postKeys,
+      })
     }()
   }
 
   // Convert entityKey to real keys
   keys := make([]*datastore.Key, len(postKeys.Keys))
   for idx, item := range postKeys.Keys {
-    keys[idx] = postKeyToDBKey(c, name, item)
+    keys[idx] = datastore.NewKey(c, name, item.StringID, item.IntID, nil)
   }
   return keys, err
 }
