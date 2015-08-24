@@ -2,21 +2,23 @@ package main
 
 import (
   "appengine"
+  "appengine/datastore"
   "appengine/urlfetch"
   "encoding/xml"
   "encoding/json"
   "fmt"
+  "github.com/mjibson/appstats"
   "net/http"
-  // "encoding/json"
-  // "math/rand"
-  // "net/url"
-  // "strconv"
-  // "helpers"
-  // "appengine/datastore"
+)
+
+const (
+  TODO_BATCH_SIZE = 10
+  DEBUG = false
 )
 
 func cron() {
-  http.HandleFunc("/cron/parse_feeds", parseFeeds)
+  // http.HandleFunc("/cron/parse_feeds", parseFeeds)
+  http.Handle("/cron/parse_feeds", appstats.NewHandler(parseFeeds))
 }
 
 var FeedParse404Error error = fmt.Errorf("Feed parcing recieved a %d Status Code", 404)
@@ -29,12 +31,8 @@ func page_url(idx int) string {
   }
 }
 
-func parseFeeds(w http.ResponseWriter, r *http.Request) {
-  // fmt.Fprint(w, "Here is your cron\n")
-  // fmt.Fprint(w, page_url(0))
-  // fmt.Fprint(w, page_url(3))
-
-  c := appengine.NewContext(r)
+func parseFeeds(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+  // c := appengine.NewContext(r)
   fp := new(FeedParser)
   fp.Main(c, w)
 }
@@ -45,27 +43,78 @@ type FeedParser struct {
   writer   http.ResponseWriter
 
   todo     []int
+  guids    map[string]bool  // this could potentially be quite a few ids
 }
 
 func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
   x.context = c
   x.writer = w
   x.client = urlfetch.Client(c)
-  is_stop, full_stop, err := x.isStop(1)
-  if is_stop || full_stop || err != nil {
+
+  // Load guids from DB
+  var posts []Post
+  q := datastore.NewQuery("Post") //.Project("guid", "link") // TODO: Need to fix
+  if _, err := q.GetAll(c, &posts); err != nil {
+    c.Errorf("Error projecting %v %v", err)
     return err
   }
+  x.guids = map[string]bool{}
+  for _, post := range posts {
+    x.guids[post.Guid] = true
+  }
+  posts = nil
+
+  // // DEBUG ONLY
+  // data, err := json.MarshalIndent(x.guids, "", "  ")
+  // fmt.Fprint(x.writer, string(data))
+  // return err
+
+  // Initial recursive edge case
+  is_stop, full_stop, err := x.isStop(1)
+  if is_stop || full_stop || err != nil {
+    c.Infof("Finished without recursive searching %v", err)
+    return err
+  }
+
+  // Recursive search strategy
   err = x.Search(1, -1)
   if err == nil {
     err = x.processTodo()
+  }
+  if err != nil {
+    c.Errorf("Error in Main %v", err)
   }
   return err
 }
 
 func (x *FeedParser) processTodo() error {
+  // TODO: Only fan out for a portion of TODO, otherwise I may go over fetch quota
   x.context.Infof("Processing TODO: %v", x.todo)
-  done := make(chan error)
+
+  var batch []int
+  var err error
   for _, idx := range x.todo {
+    if batch == nil {
+      batch = make([]int, 0)
+    }
+    batch = append(batch, idx)
+    if len(batch) >= TODO_BATCH_SIZE {
+      err = x.processBatch(batch)
+      if err != nil {
+        return err
+      }
+      batch = nil
+    }
+  }
+  if len(batch) > 0 {
+    err = x.processBatch(batch)
+  }
+  return err
+}
+
+func (x *FeedParser) processBatch(ids []int) error {
+  done := make(chan error)
+  for _, idx := range ids {
     go func (idx int) {
       posts, err := x.getAndParseFeed(idx)
       if err == nil {
@@ -79,7 +128,7 @@ func (x *FeedParser) processTodo() error {
       done <- err
     }(idx)
   }
-  for i := 0; i < len(x.todo); i++ {
+  for i := 0; i < len(ids); i++ {
     err := <-done
     if err != nil {
       x.context.Errorf("error storing feed (at index %d): %v", i, err)
@@ -97,8 +146,9 @@ func (x *FeedParser) addRange(bottom, top int) {
 
 func (x *FeedParser) Search(bottom, top int) (err error) {
   if bottom == top - 1 {
+    x.context.Infof("TOP OF RANGE FOUND! @%d", top)
     x.addRange(bottom, top)
-    return nil // Todo, store this
+    return nil
   }
   var full_stop, is_stop bool = false, false
   if top < 0 { // Searching forward
@@ -112,7 +162,7 @@ func (x *FeedParser) Search(bottom, top int) (err error) {
       top, bottom = -1, top
     }
   } else { // Binary search between top and bottom
-    middle := (bottom + top) / 2  // make sure int
+    middle := (bottom + top) / 2
     is_stop, full_stop, err = x.isStop(middle)
     if err != nil {
       return err
@@ -127,7 +177,7 @@ func (x *FeedParser) Search(bottom, top int) (err error) {
   if full_stop {
     return nil
   }
-  return x.Search(bottom, top)
+  return x.Search(bottom, top)  // TAIL RECURSION!!!
 }
 
 func (x *FeedParser) isStop(idx int) (is_stop, full_stop bool, err error) {
@@ -142,13 +192,30 @@ func (x *FeedParser) isStop(idx int) (is_stop, full_stop bool, err error) {
     return false, false, err
   }
 
-  // DEBUG ONLY
-  data, err := json.MarshalIndent(posts, "", " ")
-  fmt.Fprint(x.writer, string(data))
+  // Iterate posts, store store as necessary
+  // TODO: make storePost into a go routine, use error channel for callbacks
+  store_count := 0
+  for _, post := range posts {
+    if x.guids[post.Guid] {
+      continue
+    }
+    // TODO: only call if not in guids already
+    if err = x.storePost(post); err != nil {
+      x.context.Errorf("Error in storePost %v", err)
+      return false, false, err
+    }
+    store_count += 1
+  }
+  x.context.Infof("Stored %d posts for feed %d", store_count, idx)
 
-  // Actually loading up
-  top := 1
-  return idx > top, idx == top, nil
+  // Use storePost info to determine if isStop
+  is_stop = store_count == 0 || DEBUG
+  full_stop = len(posts) != store_count && store_count > 0
+  return
+
+  // // Testing search strategy
+  // top := 1
+  // return idx > top, idx == top, nil
 }
 
 func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
@@ -157,8 +224,11 @@ func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
   // Get Response
   x.context.Infof("Parsing index %v (%v)", idx, url)
   resp, err := x.client.Get(url)
+  if err != nil {
+    return nil, err
+  }
   defer resp.Body.Close()
-  if err != nil || resp.StatusCode != 200 {
+  if resp.StatusCode != 200 {
     if resp.StatusCode == 404 {
       return nil, FeedParse404Error
     }
@@ -186,9 +256,36 @@ func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
   return feed.Items, err
 }
 
-func (x *FeedParser) storePost(p Post) error {
+func (x *FeedParser) storePost(p Post) (err error) {
+  x.context.Infof("Storing post %v \"%v\"", p.Guid, p.Title)
+
+  // Creator
+  // temp_key := datastore.NewIncompleteKey(x.context, "Author", nil)
+  // creator_key, err := datastore.Put(x.context, temp_key, &p.JsCreator)
+  p.Creator, err = json.Marshal(&p.JsCreator)
+  if err != nil {
+    x.context.Errorf("Error storePost Marshal 1 %v", err)
+    return err
+  }
+
+  // Media
+  // TODO: store imgs
+  p.Media, err = json.Marshal(&p.JsImgs)
+  if err != nil {
+    x.context.Errorf("Error storePost Marshal 2 %v", err)
+    return err
+  }
+
+  // Post
+  temp_key := datastore.NewIncompleteKey(x.context, "Post", nil)
+  _, err = datastore.Put(x.context, temp_key, &p)
+  return err
   // TODO: database store post
-  return nil
+  // inno_key := datastore.NewIncompleteKey(c, "Post", nil)
+  // img_key_1, err := datastore.Put(c, datastore.NewIncompleteKey(c, "Img", nil), &image)
+  // _, err = datastore.Put(c, inno_key, obj)
+  // b, err := json.Marshal([]Img{image, image})
+  // return fmt.Errorf("Apples")
 }
 
 /*

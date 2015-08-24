@@ -25,7 +25,7 @@ type Post struct {
   Imgs      []*datastore.Key `datastore:"keys"    json:"-"       xml:"-"`
   Media     []byte           `datastore:"media"   json:"-"       xml:"-"`
   Creator   []byte           `datastore:"creator" json:"-"       xml:"-"`
-  Guid      string           `datastore:"guid"    json:"-"       xml:"guid"`
+  Guid      string           `datastore:"guid"    json:"guid"    xml:"guid"`
 
   JsCreator Author           `datastore:"-"       json:"creator" xml:"-"`
   JsImgs    []Img            `datastore:"-"       json:"media"   xml:"content"`

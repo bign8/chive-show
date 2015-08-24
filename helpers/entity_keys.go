@@ -19,7 +19,7 @@ type entityKey struct {
 
 const (
   defaultTimeout   = 20
-  keyStorageKind  = "DatastoreKeysCache"
+  keyStorageKind  = "DatastoreKeysCache" // TODO: sharded version of this
 )
 
 func mcKey(name string) string {
