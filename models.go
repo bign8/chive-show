@@ -21,6 +21,7 @@ type Post struct {
   Date      string           `datastore:"date"    json:"date"    xml:"pubDate"`
   Title     string           `datastore:"title"   json:"title"   xml:"title"`
 
+  // TODO: remove this block and have Guid be the keyname
   Author    *datastore.Key   `datastore:"author"  json:"-"       xml:"-"`
   Imgs      []*datastore.Key `datastore:"keys"    json:"-"       xml:"-"`
   Media     []byte           `datastore:"media"   json:"-"       xml:"-"`
