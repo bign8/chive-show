@@ -1,2 +1,4 @@
+github.com
+*.xml
 *.pyc
 .DS_Store
