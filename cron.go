@@ -11,11 +11,14 @@ import (
   "fmt"
   "github.com/mjibson/appstats"
   "net/http"
+  "net/url"
+  "regexp"
+  "strconv"
 )
 
 const (
   TODO_BATCH_SIZE = 10
-  DEBUG = false
+  DEBUG = true
   DEBUG_DEPTH = 16
   PROCESS_TODO_DEFERRED = true
 )
@@ -23,48 +26,46 @@ const (
 func cron() {
   // http.HandleFunc("/cron/parse_feeds", parseFeeds)
   http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
-  http.HandleFunc("/cron/delete", func(w http.ResponseWriter, r *http.Request) {
-    c := appengine.NewContext(r)
+  http.HandleFunc("/cron/delete", delete)
+}
 
-    q := datastore.NewQuery("Post").KeysOnly()
-    keys, err := q.GetAll(c, nil)
+func delete(w http.ResponseWriter, r *http.Request) {
+  c := appengine.NewContext(r)
+
+  q := datastore.NewQuery("Post").KeysOnly()
+  keys, err := q.GetAll(c, nil)
+  if err != nil {
+    http.Error(w, err.Error(), http.StatusInternalServerError)
+    return
+  }
+
+  // Batch Delete
+  var del_keys []*datastore.Key
+  for _, key := range keys {
+    if del_keys == nil {
+      del_keys = make([]*datastore.Key, 0)
+    }
+    del_keys = append(del_keys, key)
+    if len(del_keys) > 50 {
+      err = datastore.DeleteMulti(c, del_keys)
+      c.Infof("Deleting Keys %v", del_keys)
+      del_keys = nil
+    }
     if err != nil {
       http.Error(w, err.Error(), http.StatusInternalServerError)
       return
     }
-
-    // Batch Delete
-    var del_keys []*datastore.Key
-    for _, key := range keys {
-      if del_keys == nil {
-        del_keys = make([]*datastore.Key, 0)
-      }
-      del_keys = append(del_keys, key)
-      if len(del_keys) > 50 {
-        err = datastore.DeleteMulti(c, del_keys)
-        c.Infof("Deleting Keys %v", del_keys)
-        del_keys = nil
-      }
-      if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-      }
-    }
-    if len(del_keys) > 0 {
-      datastore.DeleteMulti(c, del_keys)
-    }
-    fmt.Fprint(w, "DELETED")
-  })
+  }
+  if len(del_keys) > 0 {
+    datastore.DeleteMulti(c, del_keys)
+  }
+  fmt.Fprint(w, "DELETED")
 }
 
 var FeedParse404Error error = fmt.Errorf("Feed parcing recieved a %d Status Code", 404)
 
 func page_url(idx int) string {
-  if idx > 0 {
-    return fmt.Sprintf("http://thechive.com/feed/?paged=%d", idx - 1)
-  } else {
-    return fmt.Sprintf("http://thechive.com/feed/?page")
-  }
+  return fmt.Sprintf("http://thechive.com/feed/?paged=%d", idx)
 }
 
 func parseFeeds(c appengine.Context, w http.ResponseWriter, r *http.Request) {
@@ -91,6 +92,7 @@ func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
   x.client = urlfetch.Client(c)
 
   // Load guids from DB
+  // TODO: do this with sharded keys
   var posts []Post
   q := datastore.NewQuery("Post") //.Project("guid", "link") // TODO: Figure out projection queries
   if _, err := q.GetAll(c, &posts); err != nil {
@@ -297,7 +299,7 @@ func (x *FeedParser) isStop(idx int) (is_stop, full_stop bool, err error) {
 }
 
 func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
-  url := page_url(idx - 1)
+  url := page_url(idx)
 
   // Get Response
   x.context.Infof("Parsing index %v (%v)", idx, url)
@@ -335,7 +337,34 @@ func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
 }
 
 func (x *FeedParser) storePost(p Post) (err error) {
+  // Remove link posts
+  url, err := url.Parse(p.Guid)
+  if err != nil {
+    return err
+  }
+  if url.Query().Get("post_type") == "sdac_links" {
+    x.context.Infof("Ignoring links post %v \"%v\"", p.Guid, p.Title)
+    return nil
+  }
+
+  // Parsing post id from guid url
+  temp_id, err := strconv.Atoi(url.Query().Get("p"))
+  if err != nil {
+    return err
+  }
+  id := int64(temp_id)
+
+  // Detect video only posts
+  video_re := regexp.MustCompile("\\([^&]*Video.*\\)")
+  if video_re.MatchString(p.Title) {
+    x.context.Infof("Ignoring video post %v \"%v\"", p.Guid, p.Title)
+    return nil
+  }
   x.context.Infof("Storing post %v \"%v\"", p.Guid, p.Title)
+
+  // Cleanup post titles
+  clean_re := regexp.MustCompile("\\W\\(([^\\)]*)\\)$")
+  p.Title = clean_re.ReplaceAllLiteralString(p.Title, "")
 
   // Creator
   // temp_key := datastore.NewIncompleteKey(x.context, "Author", nil)
@@ -355,7 +384,8 @@ func (x *FeedParser) storePost(p Post) (err error) {
   }
 
   // Post
-  temp_key := datastore.NewIncompleteKey(x.context, "Post", nil)
+  // temp_key := datastore.NewIncompleteKey(x.context, "Post", nil)
+  temp_key := datastore.NewKey(x.context, "Post", "", id, nil)
   _, err = datastore.Put(x.context, temp_key, &p)
   return err
 }
