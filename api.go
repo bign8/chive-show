@@ -30,7 +30,7 @@ func (x *Post) Load(c <-chan datastore.Property) error {
     if json.Unmarshal(x.Creator, &x.JsCreator) != nil {
       x.JsCreator = Author{
         Name: "Unknown",
-        Img: "http://www.clker.com/cliparts/5/9/4/c/12198090531909861341man%20silhouette.svg.hi.png",
+        Img: "/static/img/silhouette.png",
       }
     }
     // Load Images/Media
