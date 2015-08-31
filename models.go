@@ -1,7 +1,5 @@
 package main
 
-import "appengine/datastore"
-
 type Author struct {
   Name string `datastore:"name" json:"name"`
   Img  string `datastore:"img"  json:"img"`
@@ -22,8 +20,6 @@ type Post struct {
   Title     string           `datastore:"title"   json:"title"   xml:"title"`
 
   // TODO: remove this block and have Guid be the keyname
-  Author    *datastore.Key   `datastore:"author"  json:"-"       xml:"-"`
-  Imgs      []*datastore.Key `datastore:"keys"    json:"-"       xml:"-"`
   Media     []byte           `datastore:"media"   json:"-"       xml:"-"`
   Creator   []byte           `datastore:"creator" json:"-"       xml:"-"`
   Guid      string           `datastore:"guid"    json:"guid"    xml:"guid"`

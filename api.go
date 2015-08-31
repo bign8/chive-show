@@ -67,7 +67,7 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
   }
 
   // Pull keys from post keys object
-  keys, err := helpers.GetKeys(c, "Post")
+  keys, err := helpers.GetKeys(c, DB_POST_TABLE)
   if err != nil {
 
     c.Errorf("heleprs.GetKeys %v", err)
@@ -117,17 +117,12 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 
 func load(w http.ResponseWriter, r *http.Request) {
   c := appengine.NewContext(r)
-  inno_key := datastore.NewIncompleteKey(c, "Post", nil)
+  inno_key := datastore.NewIncompleteKey(c, DB_POST_TABLE, nil)
 
   image := Img{
     Url: "https://thechive.files.wordpress.com/2015/02/in-case-you-missed-them-check-out-the-top-posts-of-the-week-10-photos-10.jpg",
     Title: "\u201cI swear doc, I don\u2019t know how it got there\u201d",
     IsValid: true,
-  }
-
-  img_key_1, err := datastore.Put(c, datastore.NewIncompleteKey(c, "Img", nil), &image)
-  if err != nil {
-    fmt.Print(w, "Error with img_key_1")
   }
 
   b, err := json.Marshal([]Img{image, image})
@@ -141,10 +136,6 @@ func load(w http.ResponseWriter, r *http.Request) {
     Date: "Sun, 15 Feb 2015 22:48:43 +0000",
     Title: "In case you missed them, check out the Top Posts of the Week (10 Photos)",
     Creator: []byte("{\"name\": \"Dougy\", \"img\": \"http://1.gravatar.com/avatar/1e03788f973939e10eb6cf27e644c78a?s=50\u0026d=http%3A%2F%2F1.gravatar.com%2Favatar%2Fad516503a11cd5ca435acc9bb6523536%3Fs%3D50\u0026r=X\"}"),
-    Author: nil,
-    Imgs: []*datastore.Key{
-      img_key_1,
-    },
     Media: b,
   }
   _, err = datastore.Put(c, inno_key, obj)

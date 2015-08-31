@@ -21,6 +21,7 @@ const (
   DEBUG = true
   DEBUG_DEPTH = 16
   PROCESS_TODO_DEFERRED = true
+  DB_POST_TABLE = "PostNew"
 )
 
 func cron() {
@@ -32,7 +33,7 @@ func cron() {
 func delete(w http.ResponseWriter, r *http.Request) {
   c := appengine.NewContext(r)
 
-  q := datastore.NewQuery("Post").KeysOnly()
+  q := datastore.NewQuery(DB_POST_TABLE).KeysOnly()
   keys, err := q.GetAll(c, nil)
   if err != nil {
     http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -84,7 +85,7 @@ type FeedParser struct {
   client   *http.Client
 
   todo     []int
-  guids    map[string]bool  // this could be extremely large
+  guids    map[int64]bool  // this could be extremely large
 }
 
 func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
@@ -93,17 +94,16 @@ func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
 
   // Load guids from DB
   // TODO: do this with sharded keys
-  var posts []Post
-  q := datastore.NewQuery("Post") //.Project("guid", "link") // TODO: Figure out projection queries
-  if _, err := q.GetAll(c, &posts); err != nil {
-    c.Errorf("Error projecting %v %v", err)
+  keys, err := datastore.NewQuery(DB_POST_TABLE).KeysOnly().GetAll(c, nil)
+  if err != nil {
+    c.Errorf("Error finding keys %v %v", err, appengine.IsOverQuota(err))
     return err
   }
-  x.guids = map[string]bool{}
-  for _, post := range posts {
-    x.guids[post.Guid] = true
+  x.guids = map[int64]bool{}
+  for _, key := range keys {
+    x.guids[key.IntID()] = true
   }
-  posts = nil
+  keys = nil
 
   // // DEBUG ONLY
   // data, err := json.MarshalIndent(x.guids, "", "  ")
@@ -277,7 +277,8 @@ func (x *FeedParser) isStop(idx int) (is_stop, full_stop bool, err error) {
   // TODO: make storePost into a go routine, use error channel for callbacks
   store_count := 0
   for _, post := range posts {
-    if x.guids[post.Guid] {
+    id, _, err := guidToInt(post.Guid)
+    if x.guids[id] || err != nil {
       continue
     }
     if err = x.storePost(post); err != nil {
@@ -337,22 +338,15 @@ func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
 }
 
 func (x *FeedParser) storePost(p Post) (err error) {
-  // Remove link posts
-  url, err := url.Parse(p.Guid)
+  id, is_link_post, err := guidToInt(p.Guid)
   if err != nil {
     return err
   }
-  if url.Query().Get("post_type") == "sdac_links" {
+  // Remove link posts
+  if is_link_post {
     x.context.Infof("Ignoring links post %v \"%v\"", p.Guid, p.Title)
     return nil
   }
-
-  // Parsing post id from guid url
-  temp_id, err := strconv.Atoi(url.Query().Get("p"))
-  if err != nil {
-    return err
-  }
-  id := int64(temp_id)
 
   // Detect video only posts
   video_re := regexp.MustCompile("\\([^&]*Video.*\\)")
@@ -384,8 +378,24 @@ func (x *FeedParser) storePost(p Post) (err error) {
   }
 
   // Post
-  // temp_key := datastore.NewIncompleteKey(x.context, "Post", nil)
-  temp_key := datastore.NewKey(x.context, "Post", "", id, nil)
+  // temp_key := datastore.NewIncompleteKey(x.context, DB_POST_TABLE, nil)
+  temp_key := datastore.NewKey(x.context, DB_POST_TABLE, "", id, nil)
   _, err = datastore.Put(x.context, temp_key, &p)
   return err
+}
+
+func guidToInt(guid string) (int64, bool, error) {
+  // Remove link posts
+  url, err := url.Parse(guid)
+  if err != nil {
+    return -1, false, err
+  }
+
+  // Parsing post id from guid url
+  temp_id, err := strconv.Atoi(url.Query().Get("p"))
+  if err != nil {
+    return -1, false, err
+  }
+
+  return int64(temp_id), url.Query().Get("post_type") == "sdac_links", nil
 }
