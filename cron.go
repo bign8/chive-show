@@ -14,12 +14,13 @@ import (
   "net/url"
   "regexp"
   "strconv"
+  "helpers/keycache"
 )
 
 const (
   TODO_BATCH_SIZE = 10
   DEBUG = true
-  DEBUG_DEPTH = 16
+  DEBUG_DEPTH = 8
   PROCESS_TODO_DEFERRED = true
   DB_POST_TABLE = "PostNew"
 )
@@ -58,9 +59,9 @@ func delete(w http.ResponseWriter, r *http.Request) {
     }
   }
   if len(del_keys) > 0 {
-    datastore.DeleteMulti(c, del_keys)
+    err = datastore.DeleteMulti(c, del_keys)
   }
-  fmt.Fprint(w, "DELETED")
+  fmt.Fprintf(w, "%v\n%v\nDeleted", err, keycache.ResetKeys(c, DB_POST_TABLE))
 }
 
 var FeedParse404Error error = fmt.Errorf("Feed parcing recieved a %d Status Code", 404)
@@ -356,7 +357,10 @@ func (x *FeedParser) storePosts(dirty_posts []Post) (err error) {
     keys = append(keys, key)
   }
   if len(keys) > 0 {
-    _, err = datastore.PutMulti(x.context, keys, posts)
+    complete_keys, err := datastore.PutMulti(x.context, keys, posts)
+    if err == nil {
+      err = keycache.AddKeys(x.context, DB_POST_TABLE, complete_keys)
+    }
   }
   return err
 }

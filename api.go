@@ -8,7 +8,7 @@ import (
   "net/url"
   "strconv"
 
-  "helpers"
+  "helpers/keycache"
 
   "appengine"
   "appengine/datastore"
@@ -67,7 +67,7 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
   }
 
   // Pull keys from post keys object
-  keys, err := helpers.GetKeys(c, DB_POST_TABLE)
+  keys, err := keycache.GetKeys(c, DB_POST_TABLE)
   if err != nil {
 
     c.Errorf("heleprs.GetKeys %v", err)
