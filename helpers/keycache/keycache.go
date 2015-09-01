@@ -11,7 +11,7 @@ const (
 )
 
 type entityKeys struct {
-  Keys []entityKey
+  Keys []entityKey  // TODO: use prococal buffers (because why not) and have this be []byte
 }
 
 type entityKey struct {
