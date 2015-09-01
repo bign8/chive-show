@@ -86,6 +86,7 @@ type FeedParser struct {
 
   todo     []int
   guids    map[int64]bool  // this could be extremely large
+  posts    []Post
 }
 
 func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
@@ -109,6 +110,7 @@ func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
   // data, err := json.MarshalIndent(x.guids, "", "  ")
   // fmt.Fprint(w, string(data))
   // return err
+  x.posts = make([]Post, 0)
 
   // Initial recursive edge case
   is_stop, full_stop, err := x.isStop(1)
@@ -119,9 +121,24 @@ func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
 
   // Recursive search strategy
   err = x.Search(1, -1)
+
+  // storePosts and processTodo
   if err == nil {
-    err = x.processTodo()
+    errc := make(chan error)
+    go func() {
+      errc <- x.storePosts(x.posts)
+    }()
+    go func() {
+      errc <- x.processTodo()
+    }()
+    err1, err2 := <-errc, <-errc
+    if err1 != nil {
+      err = err1
+    } else if err2 != nil {
+      err = err2
+    }
   }
+
   if err != nil {
     c.Errorf("Error in Main %v", err)
   }
@@ -142,12 +159,7 @@ func (x *FeedParser) processBatch(ids []int) error {
     go func (idx int) {
       posts, err := x.getAndParseFeed(idx)
       if err == nil {
-        for _, post := range posts {
-          err = x.storePost(post)
-          if err != nil {
-            break
-          }
-        }
+        err = x.storePosts(posts)
       }
       done <- err
     }(idx)
@@ -273,23 +285,18 @@ func (x *FeedParser) isStop(idx int) (is_stop, full_stop bool, err error) {
     return false, false, err
   }
 
-  // Iterate posts, store store as necessary
-  // TODO: make storePost into a go routine, use error channel for callbacks
+  // Check for Duplicates
   store_count := 0
   for _, post := range posts {
     id, _, err := guidToInt(post.Guid)
     if x.guids[id] || err != nil {
       continue
     }
-    if err = x.storePost(post); err != nil {
-      x.context.Errorf("Error in storePost %v", err)
-      return false, false, err
-    }
     store_count += 1
   }
-  x.context.Infof("Stored %d posts for feed %d", store_count, idx)
+  x.posts = append(x.posts, posts...)
 
-  // Use storePost info to determine if isStop
+  // Use store_count info to determine if isStop
   is_stop = store_count == 0 || DEBUG
   full_stop = len(posts) != store_count && store_count > 0
   if DEBUG {
@@ -337,22 +344,39 @@ func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
   return feed.Items, err
 }
 
-func (x *FeedParser) storePost(p Post) (err error) {
+func (x *FeedParser) storePosts(dirty_posts []Post) (err error) {
+  posts := make([]Post, 0)
+  keys := make([]*datastore.Key, 0)
+  for _, post := range dirty_posts {
+    key, err := x.cleanPost(&post)
+    if err != nil {
+      continue
+    }
+    posts = append(posts, post)
+    keys = append(keys, key)
+  }
+  if len(keys) > 0 {
+    _, err = datastore.PutMulti(x.context, keys, posts)
+  }
+  return err
+}
+
+func (x *FeedParser) cleanPost(p *Post) (*datastore.Key, error) {
   id, is_link_post, err := guidToInt(p.Guid)
   if err != nil {
-    return err
+    return nil, err
   }
   // Remove link posts
   if is_link_post {
     x.context.Infof("Ignoring links post %v \"%v\"", p.Guid, p.Title)
-    return nil
+    return nil, fmt.Errorf("Ignoring links post")
   }
 
   // Detect video only posts
   video_re := regexp.MustCompile("\\([^&]*Video.*\\)")
   if video_re.MatchString(p.Title) {
     x.context.Infof("Ignoring video post %v \"%v\"", p.Guid, p.Title)
-    return nil
+    return nil, fmt.Errorf("Ignoring video post")
   }
   x.context.Infof("Storing post %v \"%v\"", p.Guid, p.Title)
 
@@ -366,7 +390,7 @@ func (x *FeedParser) storePost(p Post) (err error) {
   p.Creator, err = json.Marshal(&p.JsCreator)
   if err != nil {
     x.context.Errorf("Error storePost Marshal 1 %v", err)
-    return err
+    return nil, err
   }
 
   // Media
@@ -374,14 +398,13 @@ func (x *FeedParser) storePost(p Post) (err error) {
   p.Media, err = json.Marshal(&p.JsImgs)
   if err != nil {
     x.context.Errorf("Error storePost Marshal 2 %v", err)
-    return err
+    return nil, err
   }
 
   // Post
   // temp_key := datastore.NewIncompleteKey(x.context, DB_POST_TABLE, nil)
   temp_key := datastore.NewKey(x.context, DB_POST_TABLE, "", id, nil)
-  _, err = datastore.Put(x.context, temp_key, &p)
-  return err
+  return temp_key, nil
 }
 
 func guidToInt(guid string) (int64, bool, error) {
@@ -396,6 +419,5 @@ func guidToInt(guid string) (int64, bool, error) {
   if err != nil {
     return -1, false, err
   }
-
   return int64(temp_id), url.Query().Get("post_type") == "sdac_links", nil
 }

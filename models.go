@@ -22,7 +22,7 @@ type Post struct {
   // TODO: remove this block and have Guid be the keyname
   Media     []byte           `datastore:"media"   json:"-"       xml:"-"`
   Creator   []byte           `datastore:"creator" json:"-"       xml:"-"`
-  Guid      string           `datastore:"guid"    json:"guid"    xml:"guid"`
+  Guid      string           `datastore:"-"       json:"-"       xml:"guid"`
 
   JsCreator Author           `datastore:"-"       json:"creator" xml:"-"`
   JsImgs    []Img            `datastore:"-"       json:"media"   xml:"content"`
