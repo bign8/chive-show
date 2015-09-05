@@ -27,12 +27,18 @@ func AddKeys(c appengine.Context, name string, keys []*datastore.Key) error {
   container.addKeys(keys)
 
   // Write
-  _, err = datastore.Put(c, ds_key, &container)
-  if err != nil {
-    err = memcache.Gob.Set(c, &memcache.Item{
+  errc := make(chan error, 2)
+  go func() {
+    _, err = datastore.Put(c, ds_key, &container)
+    errc <- err
+  }()
+  go func() { // TODO: timeout if longer than Put
+    errc <- memcache.Gob.Set(c, &memcache.Item{
       Key:    mc_key,
       Object: container,
     })
-  }
-  return err
+  }()
+  err1, err2 := <-errc, <-errc
+  if err1 != nil { return err1 }
+  return err2
 }

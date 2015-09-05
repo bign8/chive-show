@@ -38,18 +38,17 @@ func GetKeys(c appengine.Context, name string) ([]*datastore.Key, error) {
     }
 
     // Fork setting memcache so other things can run
+    done := make(chan error, 1)
     go func() {
-      memcache.Gob.Set(c, &memcache.Item{
+      done <- memcache.Gob.Set(c, &memcache.Item{
         Key:    memcache_key(name),
         Object: container,
       })
     }()
+    select {
+    case err = <-done:
+    case <-time.After(3 * time.Millisecond):
+    }
   }
-
-  // Convert entityKey to real keys
-  keys := make([]*datastore.Key, len(container.Keys))
-  for idx, item := range container.Keys {
-    keys[idx] = datastore.NewKey(c, name, item.StringID, item.IntID, nil)
-  }
-  return keys, err
+  return container.toKeys(c, name), err
 }

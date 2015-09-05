@@ -10,13 +10,18 @@ const (
   PERSISTENCE_NAME = "DatastoreKeysCache"
 )
 
-type entityKeys struct {
-  Keys []entityKey  // TODO: use prococal buffers (because why not) and have this be []byte
+func memcache_key(name string) string {
+  return PERSISTENCE_NAME + ":" + name
 }
 
-type entityKey struct {
-  StringID string
-  IntID    int64
+func datastore_key(c appengine.Context, name string) *datastore.Key {
+  return datastore.NewKey(c, PERSISTENCE_NAME, name, 0, nil)
+}
+
+// Object: entityKeys
+
+type entityKeys struct {
+  Keys []entityKey  // TODO: use prococal buffers (because why not) and have this be []byte
 }
 
 func (x *entityKeys) addKeys(keys []*datastore.Key) {
@@ -40,10 +45,21 @@ func (x *entityKeys) addKeys(keys []*datastore.Key) {
   }
 }
 
-func memcache_key(name string) string {
-  return PERSISTENCE_NAME + ":" + name
+func (x *entityKeys) toKeys(c appengine.Context, name string) []*datastore.Key {
+  keys := make([]*datastore.Key, len(x.Keys))
+  for i, item := range x.Keys {
+    keys[i] = item.toKey(c, name)
+  }
+  return keys
 }
 
-func datastore_key(c appengine.Context, name string) *datastore.Key {
-  return datastore.NewKey(c, PERSISTENCE_NAME, name, 0, nil)
+// Object: entityKey
+
+type entityKey struct {
+  StringID string
+  IntID    int64
+}
+
+func (x *entityKey) toKey(c appengine.Context, name string) *datastore.Key {
+  return datastore.NewKey(c, name, x.StringID, x.IntID, nil)
 }
