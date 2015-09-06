@@ -2,7 +2,7 @@
 
 *A collection of your favorite Chive images (taylored specifically for you)*
 
-Ever want a safe for work slideshow of the images from *"Probably the best site in the World"*?  Well now you can enjoy these amazing images without the distractions apparent when viewing them within their original context.
+Ever want a safe for work slideshow of the images from *"Probably the best site in the World"*?  Well now you can enjoy these amazing images without the distractions when viewing them within their original context.
 
 # Features
 - Awesome UI and UX

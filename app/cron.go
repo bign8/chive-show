@@ -1,6 +1,7 @@
 package main
 
 import (
+  "app/helpers/keycache"
   "appengine"
   "appengine/datastore"
   "appengine/delay"
@@ -13,7 +14,6 @@ import (
   "net/url"
   "regexp"
   "strconv"
-  "helpers/keycache"
 )
 
 const (

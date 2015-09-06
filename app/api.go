@@ -1,19 +1,16 @@
 package main
 
 import (
+  "app/helpers/keycache"
+  "appengine"
+  "appengine/datastore"
   "encoding/json"
   "fmt"
+  "github.com/mjibson/appstats"
   "math/rand"
   "net/http"
   "net/url"
   "strconv"
-
-  "helpers/keycache"
-
-  "appengine"
-  "appengine/datastore"
-
-  "github.com/mjibson/appstats"
 )
 
 func api() {
