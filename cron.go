@@ -25,7 +25,6 @@ const (
 )
 
 func cron() {
-  // http.HandleFunc("/cron/parse_feeds", parseFeeds)
   http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
   http.HandleFunc("/cron/delete", delete)
 }
@@ -338,11 +337,11 @@ func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
   // Cleanup Response
   for idx := range feed.Items {
     post := &feed.Items[idx]
-    for i, img := range post.JsImgs {
-      post.JsImgs[i].Url = stripQuery(img.Url)
+    for i, img := range post.Media {
+      post.Media[i].Url = stripQuery(img.Url)
     }
-    post.MugShot = post.JsImgs[0].Url
-    post.JsImgs = post.JsImgs[1:]
+    post.MugShot = post.Media[0].Url
+    post.Media = post.Media[1:]
   }
   return feed.Items, err
 }
