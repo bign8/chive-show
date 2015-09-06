@@ -1,38 +1,56 @@
 package main
 
-type Author struct {
-  Name string `datastore:"name" json:"name"`
-  Img  string `datastore:"img"  json:"img"`
+import (
+  "appengine/datastore"
+  "encoding/json"
+)
+
+type JsonPostResponse struct {
+  Status string `json:"status"`
+  Code   int    `json:"code"`
+  Data   []Post `json:"data"`
+  Msg    string `json:"msg"`
 }
 
 type Img struct {
-  Url      string `datastore:"url"      json:"url"    xml:"url,attr"`
-  Title    string `datastore:"title"    json:"title"  xml:"title"`
-  IsValid  bool   `datastore:"is_valid" json:"-"      xml:"-"`
-  Rating   string `datastore:"rating"   json:"-"      xml:"rating"`
-  Category string `datastore:"-"        json:"-"      xml:"category"`
+  Url      string `datastore:"url"      json:"url"   xml:"url,attr"`
+  Title    string `datastore:"title"    json:"title" xml:"title"`
+  // IsValid  bool   `datastore:"is_valid" json:"-"     xml:"-"`
+  Rating   string `datastore:"rating"   json:"-"     xml:"rating"`
+  Category string `datastore:"-"        json:"-"     xml:"category"`
 }
 
 type Post struct {
-  Tags      []string         `datastore:"tags"    json:"tags"    xml:"category"`
-  Link      string           `datastore:"link"    json:"link"    xml:"link"`
-  Date      string           `datastore:"date"    json:"date"    xml:"pubDate"`
-  Title     string           `datastore:"title"   json:"title"   xml:"title"`
+  // Attributes used for generating unique leu
+  Guid      string   `datastore:"-"       json:"-"       xml:"guid"`
 
-  // TODO: remove this block and have Guid be the keyname
-  Media     []byte           `datastore:"media"   json:"-"       xml:"-"`
-  Creator   []byte           `datastore:"creator" json:"-"       xml:"-"`
-  Guid      string           `datastore:"-"       json:"-"       xml:"guid"`
+  // Direct atributes
+  Tags      []string `datastore:"tags"    json:"tags"    xml:"category"`
+  Link      string   `datastore:"link"    json:"link"    xml:"link"`
+  Date      string   `datastore:"date"    json:"date"    xml:"pubDate"`
+  Title     string   `datastore:"title"   json:"title"   xml:"title"`
+  Creator   string   `datastore:"creator" json:"creator" xml:"creator"`
 
-  JsCreator Author           `datastore:"-"       json:"creator" xml:"-"`
-  JsImgs    []Img            `datastore:"-"       json:"media"   xml:"content"`
+  // Attributes tweaked to minimize transactions (LoadSaver stuff)
+  Media     []byte   `datastore:"media"   json:"-"       xml:"-"`
+  JsImgs    []Img    `datastore:"-"       json:"media"   xml:"content"`
 
-  StrAuthor string           `datastore:"-"       json:"-"       xml:"creator"`
+  // Manually built attributes from post
+  MugShot   string   `datastore:"mugshot" json:"mugshot" xml:"-"`
 }
 
-type JsonPostResponse struct {
-  Status string     `json:"status"`
-  Code   int        `json:"code"`
-  Data   []Post     `json:"data"`
-  Msg    string     `json:"msg"`
+// Datastore LoadSaveProperty Interface
+func (x *Post) Load(c <-chan datastore.Property) error {
+  if err := datastore.LoadStruct(x, c); err != nil {
+    return err
+  }
+  return json.Unmarshal(x.Media, &x.JsImgs)
+}
+
+func (x *Post) Save(c chan<- datastore.Property) (err error) {
+  if x.Media, err = json.Marshal(&x.JsImgs); err != nil {
+    close(c)
+    return err
+  }
+  return datastore.SaveStruct(x, c)
 }

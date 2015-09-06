@@ -241,7 +241,7 @@ Chive.viewer = function () {
 
         // Post author
         var image = $('#timer_image #author')[0]
-        image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', active.creator.img)
+        image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', active.mugshot)
     }
 
     // Change image in application

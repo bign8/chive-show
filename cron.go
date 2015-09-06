@@ -7,7 +7,6 @@ import (
   "appengine/taskqueue"
   "appengine/urlfetch"
   "encoding/xml"
-  "encoding/json"
   "fmt"
   "github.com/mjibson/appstats"
   "net/http"
@@ -20,7 +19,7 @@ import (
 const (
   TODO_BATCH_SIZE = 10
   DEBUG = true
-  DEBUG_DEPTH = 8
+  DEBUG_DEPTH = 1
   PROCESS_TODO_DEFERRED = true
   DB_POST_TABLE = "PostNew"
 )
@@ -117,6 +116,9 @@ func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
   is_stop, full_stop, err := x.isStop(1)
   if is_stop || full_stop || err != nil {
     c.Infof("Finished without recursive searching %v", err)
+    if err == nil {
+      err = x.storePosts(x.posts)
+    }
     return err
   }
 
@@ -212,7 +214,7 @@ func (x *FeedParser) processTodo() error {
       err = x.processBatch(batch)
     }
   }
-  if PROCESS_TODO_DEFERRED {
+  if PROCESS_TODO_DEFERRED && len(all_tasks) > 0 {
     x.context.Infof("Adding %d task(s) to the default queue", len(all_tasks))
     taskqueue.AddMulti(x.context, all_tasks, "default")
   }
@@ -336,10 +338,10 @@ func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
   // Cleanup Response
   for idx := range feed.Items {
     post := &feed.Items[idx]
-    post.JsCreator = Author{
-      Name: post.StrAuthor,
-      Img: post.JsImgs[0].Url,
+    for i, img := range post.JsImgs {
+      post.JsImgs[i].Url = stripQuery(img.Url)
     }
+    post.MugShot = post.JsImgs[0].Url
     post.JsImgs = post.JsImgs[1:]
   }
   return feed.Items, err
@@ -388,23 +390,6 @@ func (x *FeedParser) cleanPost(p *Post) (*datastore.Key, error) {
   clean_re := regexp.MustCompile("\\W\\(([^\\)]*)\\)$")
   p.Title = clean_re.ReplaceAllLiteralString(p.Title, "")
 
-  // Creator
-  // temp_key := datastore.NewIncompleteKey(x.context, "Author", nil)
-  // creator_key, err := datastore.Put(x.context, temp_key, &p.JsCreator)
-  p.Creator, err = json.Marshal(&p.JsCreator)
-  if err != nil {
-    x.context.Errorf("Error storePost Marshal 1 %v", err)
-    return nil, err
-  }
-
-  // Media
-  // TODO: store imgs
-  p.Media, err = json.Marshal(&p.JsImgs)
-  if err != nil {
-    x.context.Errorf("Error storePost Marshal 2 %v", err)
-    return nil, err
-  }
-
   // Post
   // temp_key := datastore.NewIncompleteKey(x.context, DB_POST_TABLE, nil)
   temp_key := datastore.NewKey(x.context, DB_POST_TABLE, "", id, nil)
@@ -424,4 +409,13 @@ func guidToInt(guid string) (int64, bool, error) {
     return -1, false, err
   }
   return int64(temp_id), url.Query().Get("post_type") == "sdac_links", nil
+}
+
+func stripQuery(dirty_url string) string {
+  obj, err := url.Parse(dirty_url)
+  if err != nil {
+    return dirty_url
+  }
+  obj.RawQuery = ""
+  return obj.String()
 }

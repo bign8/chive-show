@@ -20,27 +20,6 @@ func api() {
   http.Handle("/api/v1/post/random", appstats.NewHandler(random))
 }
 
-// Datastore LoadSaveProperty Interface
-func (x *Post) Load(c <-chan datastore.Property) error {
-    if err := datastore.LoadStruct(x, c); err != nil {
-        return err
-    }
-    // Load Author
-    if json.Unmarshal(x.Creator, &x.JsCreator) != nil {
-      x.JsCreator = Author{
-        Name: "Unknown",
-        Img: "/static/img/silhouette.png",
-      }
-    }
-    // Load Images/Media
-    return json.Unmarshal(x.Media, &x.JsImgs)
-}
-
-func (x *Post) Save(c chan<- datastore.Property) error {
-    // defer close(c)
-    return datastore.SaveStruct(x, c)
-}
-
 // API Helper function
 func get_url_count(url *url.URL) int {
   x := url.Query().Get("count")
