@@ -35,7 +35,7 @@ func get_url_count(url *url.URL) int {
 
 // Actual PI functions
 func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
-  w.Header().Set("Content-Type", "application/json")
+  w.Header().Set("Content-Type", "application/json; charset=utf-8")
   count := get_url_count(r.URL)
   c.Infof("Requested %v random posts", count)
 
