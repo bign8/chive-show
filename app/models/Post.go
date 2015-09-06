@@ -1,24 +1,9 @@
-package main
+package models
 
 import (
   "appengine/datastore"
   "encoding/json"
 )
-
-type JsonPostResponse struct {
-  Status string `json:"status"`
-  Code   int    `json:"code"`
-  Data   []Post `json:"data"`
-  Msg    string `json:"msg"`
-}
-
-type Img struct {
-  Url      string `datastore:"url"      json:"url"   xml:"url,attr"`
-  Title    string `datastore:"title"    json:"title" xml:"title"`
-  // IsValid  bool   `datastore:"is_valid" json:"-"     xml:"-"`
-  Rating   string `datastore:"rating"   json:"-"     xml:"rating"`
-  Category string `datastore:"-"        json:"-"     xml:"category"`
-}
 
 type Post struct {
   // Attributes used for generating unique leu

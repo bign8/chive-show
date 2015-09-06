@@ -1,17 +1,15 @@
-package main
+package app
 
-import "net/http"
+import (
+  "app/api"
+  "app/cron"
+  "net/http"
+)
 
-// This is where Google App Engine sets up which handler lives at the root url.
 func init() {
-  // Immediately enter the main app.
-  main()
-}
-
-func main() {
-  http.HandleFunc("/", http.NotFound)  // Default Handler too
+  http.HandleFunc("/", http.NotFound)  // Default Handler
 
   // Setup Other routes routes
-  api()
-  cron()
+  api.Init()
+  cron.Init()
 }

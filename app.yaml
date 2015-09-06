@@ -23,6 +23,6 @@ handlers:
   script: _go_app
 
 error_handlers:
-  - file: static/err/default.html
+  - file: err/default.html
   - error_code: over_quota
-    file: static/err/over_quota.html
+    file: err/over_quota.html

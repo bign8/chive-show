@@ -1,6 +1,7 @@
-package main
+package api
 
 import (
+  "app/models"
   "app/helpers/keycache"
   "appengine"
   "appengine/datastore"
@@ -13,8 +14,15 @@ import (
   "strconv"
 )
 
-func api() {
+func Init() {
   http.Handle("/api/v1/post/random", appstats.NewHandler(random))
+}
+
+type JsonPostResponse struct {
+  Status string `json:"status"`
+  Code   int    `json:"code"`
+  Data   []models.Post `json:"data"`
+  Msg    string `json:"msg"`
 }
 
 // API Helper function
@@ -42,7 +50,7 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
   }
 
   // Pull keys from post keys object
-  keys, err := keycache.GetKeys(c, DB_POST_TABLE)
+  keys, err := keycache.GetKeys(c, models.DB_POST_TABLE)
   if err != nil {
 
     c.Errorf("heleprs.GetKeys %v", err)
@@ -62,7 +70,7 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
     }
 
     // Pull posts from datastore
-    data := make([]Post, count)
+    data := make([]models.Post, count)
     if err := datastore.GetMulti(c, keys[:count], data); err != nil {
 
       c.Errorf("datastore.GetMulti %v", err)

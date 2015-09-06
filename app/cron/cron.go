@@ -1,6 +1,7 @@
-package main
+package cron
 
 import (
+  "app/models"
   "app/helpers/keycache"
   "appengine"
   "appengine/datastore"
@@ -21,10 +22,9 @@ const (
   DEBUG = true
   DEBUG_DEPTH = 1
   PROCESS_TODO_DEFERRED = true
-  DB_POST_TABLE = "PostNew"
 )
 
-func cron() {
+func Init() {
   http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
   http.HandleFunc("/cron/delete", delete)
 }
@@ -32,7 +32,7 @@ func cron() {
 func delete(w http.ResponseWriter, r *http.Request) {
   c := appengine.NewContext(r)
 
-  q := datastore.NewQuery(DB_POST_TABLE).KeysOnly()
+  q := datastore.NewQuery(models.DB_POST_TABLE).KeysOnly()
   keys, err := q.GetAll(c, nil)
   if err != nil {
     http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -59,7 +59,7 @@ func delete(w http.ResponseWriter, r *http.Request) {
   if len(del_keys) > 0 {
     err = datastore.DeleteMulti(c, del_keys)
   }
-  fmt.Fprintf(w, "%v\n%v\nDeleted", err, keycache.ResetKeys(c, DB_POST_TABLE))
+  fmt.Fprintf(w, "%v\n%v\nDeleted", err, keycache.ResetKeys(c, models.DB_POST_TABLE))
 }
 
 var FeedParse404Error error = fmt.Errorf("Feed parcing recieved a %d Status Code", 404)
@@ -85,7 +85,7 @@ type FeedParser struct {
 
   todo     []int
   guids    map[int64]bool  // this could be extremely large
-  posts    []Post
+  posts    []models.Post
 }
 
 func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
@@ -94,7 +94,7 @@ func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
 
   // Load guids from DB
   // TODO: do this with sharded keys
-  keys, err := datastore.NewQuery(DB_POST_TABLE).KeysOnly().GetAll(c, nil)
+  keys, err := datastore.NewQuery(models.DB_POST_TABLE).KeysOnly().GetAll(c, nil)
   if err != nil {
     c.Errorf("Error finding keys %v %v", err, appengine.IsOverQuota(err))
     return err
@@ -109,7 +109,7 @@ func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
   // data, err := json.MarshalIndent(x.guids, "", "  ")
   // fmt.Fprint(w, string(data))
   // return err
-  x.posts = make([]Post, 0)
+  x.posts = make([]models.Post, 0)
 
   // Initial recursive edge case
   is_stop, full_stop, err := x.isStop(1)
@@ -308,7 +308,7 @@ func (x *FeedParser) isStop(idx int) (is_stop, full_stop bool, err error) {
   return
 }
 
-func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
+func (x *FeedParser) getAndParseFeed(idx int) ([]models.Post, error) {
   url := page_url(idx)
 
   // Get Response
@@ -328,7 +328,7 @@ func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
   // Decode Response
   decoder := xml.NewDecoder(resp.Body)
   var feed struct {
-    Items []Post `xml:"channel>item"`
+    Items []models.Post `xml:"channel>item"`
   }
   if decoder.Decode(&feed) != nil {
     return nil, err
@@ -346,8 +346,8 @@ func (x *FeedParser) getAndParseFeed(idx int) ([]Post, error) {
   return feed.Items, err
 }
 
-func (x *FeedParser) storePosts(dirty_posts []Post) (err error) {
-  posts := make([]Post, 0)
+func (x *FeedParser) storePosts(dirty_posts []models.Post) (err error) {
+  posts := make([]models.Post, 0)
   keys := make([]*datastore.Key, 0)
   for _, post := range dirty_posts {
     key, err := x.cleanPost(&post)
@@ -360,13 +360,13 @@ func (x *FeedParser) storePosts(dirty_posts []Post) (err error) {
   if len(keys) > 0 {
     complete_keys, err := datastore.PutMulti(x.context, keys, posts)
     if err == nil {
-      err = keycache.AddKeys(x.context, DB_POST_TABLE, complete_keys)
+      err = keycache.AddKeys(x.context, models.DB_POST_TABLE, complete_keys)
     }
   }
   return err
 }
 
-func (x *FeedParser) cleanPost(p *Post) (*datastore.Key, error) {
+func (x *FeedParser) cleanPost(p *models.Post) (*datastore.Key, error) {
   id, is_link_post, err := guidToInt(p.Guid)
   if err != nil {
     return nil, err
@@ -391,7 +391,7 @@ func (x *FeedParser) cleanPost(p *Post) (*datastore.Key, error) {
 
   // Post
   // temp_key := datastore.NewIncompleteKey(x.context, DB_POST_TABLE, nil)
-  temp_key := datastore.NewKey(x.context, DB_POST_TABLE, "", id, nil)
+  temp_key := datastore.NewKey(x.context, models.DB_POST_TABLE, "", id, nil)
   return temp_key, nil
 }
 
