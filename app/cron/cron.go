@@ -29,40 +29,9 @@ func Init() {
   http.HandleFunc("/cron/delete", delete)
 }
 
-func delete(w http.ResponseWriter, r *http.Request) {
-  c := appengine.NewContext(r)
-
-  q := datastore.NewQuery(models.DB_POST_TABLE).KeysOnly()
-  keys, err := q.GetAll(c, nil)
-  if err != nil {
-    http.Error(w, err.Error(), http.StatusInternalServerError)
-    return
-  }
-
-  // Batch Delete
-  var del_keys []*datastore.Key
-  for _, key := range keys {
-    if del_keys == nil {
-      del_keys = make([]*datastore.Key, 0)
-    }
-    del_keys = append(del_keys, key)
-    if len(del_keys) > 50 {
-      err = datastore.DeleteMulti(c, del_keys)
-      c.Infof("Deleting Keys %v", del_keys)
-      del_keys = nil
-    }
-    if err != nil {
-      http.Error(w, err.Error(), http.StatusInternalServerError)
-      return
-    }
-  }
-  if len(del_keys) > 0 {
-    err = datastore.DeleteMulti(c, del_keys)
-  }
-  fmt.Fprintf(w, "%v\n%v\nDeleted", err, keycache.ResetKeys(c, models.DB_POST_TABLE))
-}
-
-var FeedParse404Error error = fmt.Errorf("Feed parcing recieved a %d Status Code", 404)
+var (
+  FeedParse404Error error = fmt.Errorf("Feed parcing recieved a %d Status Code", 404)
+)
 
 func page_url(idx int) string {
   return fmt.Sprintf("http://thechive.com/feed/?paged=%d", idx)
