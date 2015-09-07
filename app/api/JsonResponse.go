@@ -36,6 +36,7 @@ func (res *JsonResponse) write(w http.ResponseWriter) error {
   } else {
     out = string(str_items)
   }
+  w.Header().Set("Content-Type", "application/json; charset=utf-8")
   fmt.Fprint(w, out)
   return err
 }
