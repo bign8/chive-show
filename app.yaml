@@ -1,12 +1,7 @@
 application: crucial-alpha-706
-version: 1
-runtime: python27
-api_version: 1
-threadsafe: yes
-
-libraries:
-- name: lxml
-  version: "2.3.5"
+version: 2
+runtime: go
+api_version: go1
 
 handlers:
 - url: /static
@@ -16,15 +11,18 @@ handlers:
   static_files: static/index.html
   upload: static/index.html
 
+- url: /(favicon\.ico|index\.html)
+  static_files: static/\1
+  upload: static/(favicon\.ico|index\.html)
+
 - url: /cron/.*
-  script: app.cron
+  script: _go_app
   login: admin
 
-- url: /api/.*
-  script: app.api
-
-- url: .*
-  script: app.err
+- url: /.*
+  script: _go_app
 
 error_handlers:
   - file: err/default.html
+  - error_code: over_quota
+    file: err/over_quota.html

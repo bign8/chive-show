@@ -8,6 +8,7 @@
 // TODO: remove jquery: http://youmightnotneedjquery.com/
 // TODO: cache data locally
 // TODO: Video: http://knowledge.kaltura.com/embedding-kaltura-media-players-your-site
+// TODO: Don't use promose chains, use requestAnimationFrame stuff
 
 /* Front End Documentation:
 http://bootswatch.com/cyborg/
@@ -240,7 +241,7 @@ Chive.viewer = function () {
 
         // Post author
         var image = $('#timer_image #author')[0]
-        image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', active.creator.img)
+        image.setAttributeNS('http://www.w3.org/1999/xlink', 'href', active.mugshot)
     }
 
     // Change image in application
@@ -248,7 +249,7 @@ Chive.viewer = function () {
 
         // If list is empty -> reload
         if (!list.length)
-            return reload_list().then(run);
+            return load_list().then(run);
 
         // Check if curent article is active
         if (!active || !active.media.length) {
