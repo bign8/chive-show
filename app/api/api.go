@@ -18,14 +18,12 @@ func Init() {
 
 // API Helper function
 func get_url_count(url *url.URL) int {
-  x := url.Query().Get("count")
-  // if x == "" { return 2 }
-  val, err := strconv.Atoi(x)
+  val, err := strconv.Atoi(url.Query().Get("count"))
   if err != nil || val > 30 || val < 1 { return 2 }
   return val
 }
 
-// Actual PI functions
+// Actual API functions
 func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
   w.Header().Set("Content-Type", "application/json; charset=utf-8")
   count := get_url_count(r.URL)
@@ -49,7 +47,7 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
     }
 
     // Pull posts from datastore
-    data := make([]models.Post, count)
+    data := make([]models.Post, count) // TODO: cache items in memcache too (make a helper)
     if err := datastore.GetMulti(c, keys[:count], data); err != nil {
       c.Errorf("datastore.GetMulti %v", err)
       result.Msg = "Error with datastore GetMulti"
