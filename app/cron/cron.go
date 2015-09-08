@@ -25,6 +25,7 @@ const (
 )
 
 func Init() {
+  http.Handle("/cron/crawl", appstats.NewHandler(crawl))
   http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
   http.HandleFunc("/cron/delete", delete)
 }
