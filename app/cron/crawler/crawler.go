@@ -1,4 +1,4 @@
-package cron
+package crawler
 
 import (
   // "app/models"
@@ -9,7 +9,6 @@ import (
   // "appengine/taskqueue"
   "appengine/urlfetch"
   "encoding/xml"
-  "encoding/json"
   "fmt"
   "net/http"
 )
@@ -25,8 +24,12 @@ type ChivePostMiner struct {
   Item ChivePost `xml:"channel>item"`
 }
 
+func page_url(idx int) string {
+  return fmt.Sprintf("http://thechive.com/feed/?paged=%d", idx)
+}
 
-func crawl(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+
+func Crawl(c appengine.Context, w http.ResponseWriter, r *http.Request) {
   url := page_url(0)
 
   // Get Response
@@ -59,31 +62,36 @@ func crawl(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 
   // DEBUGGING ONLY.... HERE DOWN
 
-  post, err := parseData(feed[0].Item.XML)
-  if err != nil {
-    c.Errorf("error parsing %v", err)
-    return
-  }
-
-  // JSONIFY Response
-  str_items, err := json.MarshalIndent(&post, "", "  ")
-  var out string
-  if err != nil {
-    out = "{\"status\":\"error\",\"code\":500,\"data\":null,\"msg\":\"Error marshaling data\"}"
-  } else {
-    out = string(str_items)
-  }
-  w.Header().Set("Content-Type", "application/json; charset=utf-8")
-  fmt.Fprint(w, out)
+  // post, err := parseData(feed[0].Item.XML)
+  // if err != nil {
+  //   c.Errorf("error parsing %v", err)
+  //   return
+  // }
+  //
+  // // JSONIFY Response
+  // str_items, err := json.MarshalIndent(&post, "", "  ")
+  // var out string
+  // if err != nil {
+  //   out = "{\"status\":\"error\",\"code\":500,\"data\":null,\"msg\":\"Error marshaling data\"}"
+  // } else {
+  //   out = string(str_items)
+  // }
+  // w.Header().Set("Content-Type", "application/json; charset=utf-8")
+  // fmt.Fprint(w, out)
 }
 
-
-type FeedCrawler struct {
-  context appengine.Context
-  client  *http.Client
+func Crawl2(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+  crawler := NewFeedCrawler(c)
+  found_posts := crawler.StartSearch()
+  batch_posts := Batcher(found_posts, 20)
+  Storage(batch_posts, c)
 }
 
-func (fc *FeedCrawler) Init(c appengine.Context) {
-  fc.context = c
-  fc.client = urlfetch.Client(c)
+func Storage(in <-chan []ChivePost, c appengine.Context) {
+  go func() {
+    for batch := range in {
+      fmt.Println(batch)
+      c.Infof("Storing %v", batch)
+    }
+  }()
 }

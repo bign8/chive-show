@@ -1,6 +1,7 @@
 package cron
 
 import (
+  "app/cron/crawler"
   "app/models"
   "app/helpers/keycache"
   "appengine"
@@ -25,7 +26,8 @@ const (
 )
 
 func Init() {
-  http.Handle("/cron/crawl", appstats.NewHandler(crawl))
+  http.Handle("/cron/crawl", appstats.NewHandler(crawler.Crawl))
+  http.Handle("/cron/crawl2", appstats.NewHandler(crawler.Crawl2))
   http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
   http.HandleFunc("/cron/delete", delete)
 }
