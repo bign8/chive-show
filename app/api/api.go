@@ -1,11 +1,11 @@
 package api
 
 import (
-  "app/models"
-  "app/helpers/keycache"
+  "github.com/bign8/chive-show/app/models"
+  "github.com/bign8/chive-show/app/helpers/keycache"
   "appengine"
   "appengine/datastore"
-  "github.com/mjibson/appstats"
+  // "github.com/mjibson/appstats"
   "math/rand"
   "net/http"
   "net/url"
@@ -13,7 +13,8 @@ import (
 )
 
 func Init() {
-  http.Handle("/api/v1/post/random", appstats.NewHandler(random))
+  // http.Handle("/api/v1/post/random", appstats.NewHandler(random))
+  http.HandleFunc("/api/v1/post/random", random)
 }
 
 // API Helper function
@@ -24,7 +25,9 @@ func get_url_count(url *url.URL) int {
 }
 
 // Actual API functions
-func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+// func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+func random(w http.ResponseWriter, r *http.Request) {
+  c := appengine.NewContext(r)
   w.Header().Set("Content-Type", "application/json; charset=utf-8")
   count := get_url_count(r.URL)
   c.Infof("Requested %v random posts", count)

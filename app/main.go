@@ -1,8 +1,8 @@
 package app
 
 import (
-  "app/api"
-  "app/cron"
+  "github.com/bign8/chive-show/app/api"
+  "github.com/bign8/chive-show/app/cron"
   "net/http"
 )
 

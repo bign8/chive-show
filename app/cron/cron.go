@@ -1,8 +1,8 @@
 package cron
 
 import (
-  "app/models"
-  "app/helpers/keycache"
+  "github.com/bign8/chive-show/app/models"
+  "github.com/bign8/chive-show/app/helpers/keycache"
   "appengine"
   "appengine/datastore"
   "appengine/delay"
@@ -10,7 +10,7 @@ import (
   "appengine/urlfetch"
   "encoding/xml"
   "fmt"
-  "github.com/mjibson/appstats"
+  // "github.com/mjibson/appstats"
   "net/http"
   "net/url"
   "regexp"
@@ -25,7 +25,8 @@ const (
 )
 
 func Init() {
-  http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
+  // http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
+  http.HandleFunc("/cron/parse", parseFeeds)
   http.HandleFunc("/cron/delete", delete)
 }
 
@@ -37,8 +38,9 @@ func page_url(idx int) string {
   return fmt.Sprintf("http://thechive.com/feed/?paged=%d", idx)
 }
 
-func parseFeeds(c appengine.Context, w http.ResponseWriter, r *http.Request) {
-  // c := appengine.NewContext(r)
+// func parseFeeds(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+func parseFeeds(w http.ResponseWriter, r *http.Request) {
+  c := appengine.NewContext(r)
   fp := new(FeedParser)
   err := fp.Main(c, w)
   if err != nil {
