@@ -1,13 +1,19 @@
 package models
 
-func NewStreamRecord(stream string, data Record) *StreamRecord {
+type StreamTitle string
+
+func NewStreamTitle(stream interface{}) StreamTitle {
+  return stream.(StreamTitle)
+}
+
+type StreamRecord struct {
+  Stream StreamTitle
+  Record Record
+}
+
+func NewStreamRecord(stream StreamTitle, data Record) *StreamRecord {
   return &StreamRecord{
     Stream: stream,
     Record: data,
   }
-}
-
-type StreamRecord struct {
-  Stream string
-  Record Record
 }

@@ -1,4 +1,4 @@
-package pipeline
+package main
 
 type SetmentConfig struct {
   InputStreams []InputStreamConfig

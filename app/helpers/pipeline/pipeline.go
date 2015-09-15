@@ -1,6 +1,6 @@
-package pipeline
+package main
 
-import "app/helpers/pipeline/models"
+import "./models"
 
 func Run(configFile string) error {
   // TODO: do stuff
@@ -9,11 +9,11 @@ func Run(configFile string) error {
   // TODO: spin up goroutines if necessary
   // TODO: all the things
   // TODO: key mining
-  pl := NewPipelineMaster()
+  // pl := NewPipelineMaster()
 
   // TODO: parse config
 
-  go pl.Main()
+  // go pl.Main()
   return nil
 }
 
@@ -29,8 +29,11 @@ type PipelineMaster struct {
   jobs   map[JobID]*Job
 }
 
-func (pl *PipelineMaster) Main() {
-  // TODO: run pipelines
+func (pl *PipelineMaster) Main(done <-chan struct{}) {
+  for {
+    // run pipelines
+  }
+  // TODO: tear down
 }
 
 func (pl *PipelineMaster) Inject(data models.StreamRecord) {
@@ -41,8 +44,9 @@ func (pl *PipelineMaster) NewJob(task string, payload models.Record) JobID {
   // TODO: pre-allocate pipeline goroutines
   id := pl.newJobId()
   job := NewJob(id)
+  title := models.NewStreamTitle(task)
   pl.jobs[id] = job
-  pl.Inject(*models.NewStreamRecord(task, payload))
+  pl.Inject(*models.NewStreamRecord(title, payload))
   return job.Id
 }
 

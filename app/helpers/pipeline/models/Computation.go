@@ -31,7 +31,7 @@ func (c *Computation) SetTimer(timer Timer) {
   }()
 }
 
-func (c *Computation) ProduceRecord(data Record, stream string) {
+func (c *Computation) ProduceRecord(data Record, stream StreamTitle) {
   c.out <- StreamRecord{
     Record: data,
     Stream: stream,

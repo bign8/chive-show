@@ -1,7 +1,7 @@
-package pipeline
+package main
 
 import (
-  "app/helpers/pipeline/models"
+  "./models"
   "net/http"
 )
 
