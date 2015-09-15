@@ -1,6 +1,9 @@
 package main
 
-import "./models"
+import (
+  "./models"
+  "./JobManager"
+)
 
 func Run(configFile string) error {
   // TODO: do stuff
@@ -20,13 +23,13 @@ func Run(configFile string) error {
 func NewPipelineMaster() *PipelineMaster {
   return &PipelineMaster{
     stream: make(chan models.StreamRecord),
-    jobs:   make(map[JobID]*Job),
+    jobs:   make(map[JobManager.JobID]*JobManager.Job),
   }
 }
 
 type PipelineMaster struct {
   stream chan models.StreamRecord
-  jobs   map[JobID]*Job
+  jobs   map[JobManager.JobID]*JobManager.Job
 }
 
 func (pl *PipelineMaster) Main(done <-chan struct{}) {
@@ -38,30 +41,4 @@ func (pl *PipelineMaster) Main(done <-chan struct{}) {
 
 func (pl *PipelineMaster) Inject(data models.StreamRecord) {
   pl.stream <- data
-}
-
-func (pl *PipelineMaster) NewJob(task string, payload models.Record) JobID {
-  // TODO: pre-allocate pipeline goroutines
-  id := pl.newJobId()
-  job := NewJob(id)
-  title := models.NewStreamTitle(task)
-  pl.jobs[id] = job
-  pl.Inject(*models.NewStreamRecord(title, payload))
-  return job.Id
-}
-
-func (pl *PipelineMaster) newJobId() JobID {
-  id := generateJobID()
-  for pl.jobs[id] != nil {
-    id = generateJobID()
-  }
-  return id
-}
-
-func (pl *PipelineMaster) GetJob(id JobID) *Job {
-  return pl.jobs[id]
-}
-
-func (pl *PipelineMaster) DelJob(id JobID) {
-  // TODO: figure out how to implement this
 }

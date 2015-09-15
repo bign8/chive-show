@@ -1,8 +1,7 @@
-package main
+package JobManager
 
 import (
-  "./models"
-  "math/rand"
+  "../models"
 )
 
 type JobStatus uint
@@ -14,20 +13,9 @@ const (
   FAILURE  JobStatus = 2
 )
 
-func generateJobID() JobID {
-  return JobID(rand.Uint32())
-}
-
-func NewJob(id JobID) *Job {
-  return &Job{
-    Id: id,
-    Status: PENDING,
-    Progress: 0,
-    Result: nil,
-  }
-}
-
+// TODO make all this private
 // TODO: add serialize helpers here
+// TODO: make threadsafe getters and setters
 type Job struct {
   Id       JobID
   Status   JobStatus

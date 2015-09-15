@@ -2,6 +2,7 @@ package main
 
 import (
   // "flag"
+  "./JobManager"
   "encoding/json"
   "fmt"
   // "html"
@@ -44,9 +45,9 @@ func main() {
 
     w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-    job := Job{
-      Id:       generateJobID(),
-      Status:   PENDING,
+    job := JobManager.Job{
+      Id:       99,
+      Status:   JobManager.PENDING,
       Progress: 94,
       Result:   []byte{1,2,3},
     }
