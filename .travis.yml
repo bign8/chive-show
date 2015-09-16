@@ -4,19 +4,11 @@ sudo: false
 go:
   - 1.4
 
-install:
-  - export VERSION=$(curl https://appengine.google.com/api/updatecheck | grep release | grep -o '[0-9\.]*')
-  - echo $VERSION
-  - export FILE=go_appengine_sdk_linux_amd64-$VERSION.zip
-  - echo $FILE
-  - curl -O https://storage.googleapis.com/appengine-sdks/featured/$FILE
-  - unzip -q $FILE
-  # - export HERE=`pwd`
-  # - cd $GOROOT/src && GOOS=linux GOARCH=amd64 ./make.bash --no-clean
-  # - export GOROOT=$HERE/go_appengine/goroot
-  # - go get github.com/mjibson/appstats
+# Notes: http://orcaman.blogspot.com/2014/09/ci-when-githubtravis-meet-gogae.html
+install: ./script/ci/install.sh
+before_script: ./script/ci/before_script.sh
+script: ./script/ci/script.sh
+after_success: ./script/ci/after_success.sh
 
-script:
-  - go version
-  - ./go_appengine/goapp test ./app/...
-  - ./go_appengine/goapp build ./app/...
+notifications:
+  email: false
