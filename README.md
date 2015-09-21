@@ -1,5 +1,5 @@
 # [theChive](http://thechive.com) Show
-[![Build Status](https://travis-ci.org/bign8/chive-show.svg)](https://travis-ci.org/bign8/chive-show) [![codecov.io](http://codecov.io/github/bign8/chive-show/coverage.svg?branch=master)](http://codecov.io/github/bign8/chive-show?branch=master)
+[![Build Status](https://travis-ci.org/bign8/chive-show.svg)](https://travis-ci.org/bign8/chive-show) [![codecov.io](http://codecov.io/github/bign8/chive-show/coverage.svg)](http://codecov.io/github/bign8/chive-show)
 
 *A collection of your favorite Chive images (taylored specifically for you)*
 
