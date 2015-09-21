@@ -2,7 +2,9 @@
 set -e
 echo "running goapp get to fetch dependencies..."
 
+../go_appengine/goapp get golang.org/x/tools/cmd/cover
 ../go_appengine/goapp get ./app/...
+
 echo "dependencies fetched."
 exit 0
 
