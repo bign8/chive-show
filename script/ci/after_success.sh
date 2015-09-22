@@ -8,7 +8,7 @@ set -e
 echo "PR# $TRAVIS_PULL_REQUEST"
 # python $GAE_DIR/appcfg.py --oauth2_refresh_token=$GAE_OAUTH update $APP_DIR
 
-codecov --dump
+codecov
 
 echo "SUCCESS!!!!"
 
