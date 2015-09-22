@@ -11,3 +11,7 @@ echo "PR# $TRAVIS_PULL_REQUEST"
 codecov
 
 echo "SUCCESS!!!!"
+
+echo "start coverage"
+cat coverage.txt
+echo "end coverage"

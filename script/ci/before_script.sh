@@ -2,6 +2,8 @@
 set -e
 echo "running goapp get to fetch dependencies..."
 
+../go_appengine/goapp get github.com/onsi/gomega
+../go_appengine/goapp get github.com/onsi/ginkgo
 ../go_appengine/goapp get golang.org/x/tools/cmd/cover
 ../go_appengine/goapp get ./app/...
 
