@@ -1,8 +1,8 @@
 package api
 
 import (
-  "app/models"
-  "app/helpers/keycache"
+  "github.com/bign8/chive-show/app/models"
+  "github.com/bign8/chive-show/app/helpers/keycache"
   "appengine"
   "appengine/datastore"
   "github.com/mjibson/appstats"

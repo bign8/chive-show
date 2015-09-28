@@ -3,8 +3,8 @@ package cron
 // TODO: delete this file once feed versioning is a thing
 
 import (
-  "app/models"
-  "app/helpers/keycache"
+  "github.com/bign8/chive-show/app/models"
+  "github.com/bign8/chive-show/app/helpers/keycache"
   "appengine"
   "appengine/datastore"
   "fmt"
