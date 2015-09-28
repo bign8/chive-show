@@ -1,7 +1,10 @@
 application: crucial-alpha-706
-version: 2.0.1
+version: 2-0-1
 runtime: go
 api_version: go1
+
+skip_files:
+- test/*
 
 handlers:
 - url: /static
