@@ -1,8 +1,8 @@
 package cron
 
 import (
-  "app/models"
-  "app/helpers/keycache"
+  "github.com/bign8/chive-show/app/models"
+  "github.com/bign8/chive-show/app/helpers/keycache"
   "appengine"
   "appengine/datastore"
   "appengine/delay"
@@ -38,7 +38,6 @@ func page_url(idx int) string {
 }
 
 func parseFeeds(c appengine.Context, w http.ResponseWriter, r *http.Request) {
-  // c := appengine.NewContext(r)
   fp := new(FeedParser)
   err := fp.Main(c, w)
   if err != nil {
