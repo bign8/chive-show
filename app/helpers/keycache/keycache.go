@@ -20,8 +20,10 @@ func datastore_key(c appengine.Context, name string) *datastore.Key {
 
 // Object: entityKeys
 
+// TODO: use prococal buffers (because why not) and have this be []byte
+// TODO: or use array of strings with GobDecode / GobEncode (since that uses buffers already)
 type entityKeys struct {
-  Keys []entityKey  // TODO: use prococal buffers (because why not) and have this be []byte
+  Keys []entityKey
 }
 
 func (x *entityKeys) addKeys(keys []*datastore.Key) {
@@ -55,6 +57,7 @@ func (x *entityKeys) toKeys(c appengine.Context, name string) []*datastore.Key {
 
 // Object: entityKey
 
+// TODO: convert to using GobDecode / GobEncode
 type entityKey struct {
   StringID string
   IntID    int64
