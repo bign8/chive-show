@@ -2,16 +2,14 @@
 
 set -e
 
-# export GAE_OAUTH=<your_oauth_token>
-# export GAE_DIR=../go_appengine
-# export APP_DIR=.
-echo "PR# $TRAVIS_PULL_REQUEST"
-# python $GAE_DIR/appcfg.py --oauth2_refresh_token=$GAE_OAUTH update $APP_DIR
-
+# Upload coverage
 codecov
 
-echo "SUCCESS!!!!"
+# Deploy to appengine
+export GAE_DIR=../go_appengine
+export APP_DIR=.
+echo "PR# $TRAVIS_PULL_REQUEST"
+# TODO: use latest commit in part of deploy-id
+python $GAE_DIR/appcfg.py --oauth2_refresh_token=$GAE_OAUTH_REFRESH_TOKEN update $APP_DIR
 
-echo "start coverage"
-cat coverage.txt
-echo "end coverage"
+echo "SUCCESS!!!!"
