@@ -14,12 +14,13 @@ import (
 	"appengine/datastore"
 )
 
+// Init fired to initialize api
 func Init() {
 	http.Handle("/api/v1/post/random", appstats.NewHandler(random))
 }
 
 // API Helper function
-func get_url_count(url *url.URL) int {
+func getURLCount(url *url.URL) int {
 	val, err := strconv.Atoi(url.Query().Get("count"))
 	if err != nil || val > 30 || val < 1 {
 		return 2
@@ -30,12 +31,12 @@ func get_url_count(url *url.URL) int {
 // Actual API functions
 func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	count := get_url_count(r.URL)
+	count := getURLCount(r.URL)
 	c.Infof("Requested %v random posts", count)
-	result := NewJsonResponse(500, "Unknown Error", nil)
+	result := NewJSONResponse(http.StatusInternalServerError, "Unknown Error", nil)
 
 	// Pull keys from post keys object
-	keys, err := keycache.GetKeys(c, models.DB_POST_TABLE)
+	keys, err := keycache.GetKeys(c, models.POST)
 	if err != nil {
 		c.Errorf("heleprs.GetKeys %v", err)
 		result.Msg = "Error with keycache GetKeys"
@@ -56,7 +57,7 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 			c.Errorf("datastore.GetMulti %v", err)
 			result.Msg = "Error with datastore GetMulti"
 		} else {
-			result = NewJsonResponse(200, "Your amazing data awaits", data)
+			result = NewJSONResponse(http.StatusOK, "Your amazing data awaits", data)
 		}
 	}
 

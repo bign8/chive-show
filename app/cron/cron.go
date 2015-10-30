@@ -20,27 +20,36 @@ import (
 )
 
 const (
-	TODO_BATCH_SIZE       = 10
-	DEBUG                 = true
-	DEBUG_DEPTH           = 1
-	PROCESS_TODO_DEFERRED = true
+	// SIZE of a batch
+	SIZE = 10
+
+	// DEBUG enable if troubleshooting algorithm
+	DEBUG = true
+
+	// DEPTH depth of feed mining
+	DEPTH = 1
+
+	// DEFERRED if deferreds should be processed deferred
+	DEFERRED = true
 )
 
+// Init initializes cron handlers
 func Init() {
 	http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
 	http.HandleFunc("/cron/delete", delete)
 }
 
 var (
-	FeedParse404Error error = fmt.Errorf("Feed parcing recieved a %d Status Code", 404)
+	// ErrFeedParse404 if feed page is not found
+	ErrFeedParse404 = fmt.Errorf("Feed parcing recieved a %d Status Code", 404)
 )
 
-func page_url(idx int) string {
+func pageURL(idx int) string {
 	return fmt.Sprintf("http://thechive.com/feed/?paged=%d", idx)
 }
 
 func parseFeeds(c appengine.Context, w http.ResponseWriter, r *http.Request) {
-	fp := new(FeedParser)
+	fp := new(feedParser)
 	err := fp.Main(c, w)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -49,7 +58,7 @@ func parseFeeds(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type FeedParser struct {
+type feedParser struct {
 	context appengine.Context
 	client  *http.Client
 
@@ -58,13 +67,13 @@ type FeedParser struct {
 	posts []models.Post
 }
 
-func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
+func (x *feedParser) Main(c appengine.Context, w http.ResponseWriter) error {
 	x.context = c
 	x.client = urlfetch.Client(c)
 
 	// Load guids from DB
 	// TODO: do this with sharded keys
-	keys, err := datastore.NewQuery(models.DB_POST_TABLE).KeysOnly().GetAll(c, nil)
+	keys, err := datastore.NewQuery(models.POST).KeysOnly().GetAll(c, nil)
 	if err != nil {
 		c.Errorf("Error finding keys %v %v", err, appengine.IsOverQuota(err))
 		return err
@@ -82,8 +91,8 @@ func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
 	x.posts = make([]models.Post, 0)
 
 	// Initial recursive edge case
-	is_stop, full_stop, err := x.isStop(1)
-	if is_stop || full_stop || err != nil {
+	isStop, fullStop, err := x.isStop(1)
+	if isStop || fullStop || err != nil {
 		c.Infof("Finished without recursive searching %v", err)
 		if err == nil {
 			err = x.storePosts(x.posts)
@@ -118,14 +127,14 @@ func (x *FeedParser) Main(c appengine.Context, w http.ResponseWriter) error {
 }
 
 var processBatchDeferred = delay.Func("process-todo-batch", func(c appengine.Context, ids []int) {
-	parser := FeedParser{
+	parser := feedParser{
 		context: c,
 		client:  urlfetch.Client(c),
 	}
 	parser.processBatch(ids)
 })
 
-func (x *FeedParser) processBatch(ids []int) error {
+func (x *feedParser) processBatch(ids []int) error {
 	done := make(chan error)
 	for _, idx := range ids {
 		go func(idx int) {
@@ -146,23 +155,23 @@ func (x *FeedParser) processBatch(ids []int) error {
 	return nil
 }
 
-func (x *FeedParser) processTodo() error {
+func (x *feedParser) processTodo() error {
 	x.context.Infof("Processing TODO: %v", x.todo)
 
 	var batch []int
 	var task *taskqueue.Task
-	all_tasks := make([]*taskqueue.Task, 0)
+	var allTasks []*taskqueue.Task
 	var err error
 	for _, idx := range x.todo {
 		if batch == nil {
 			batch = make([]int, 0)
 		}
 		batch = append(batch, idx)
-		if len(batch) >= TODO_BATCH_SIZE {
-			if PROCESS_TODO_DEFERRED {
+		if len(batch) >= SIZE {
+			if DEFERRED {
 				task, err = processBatchDeferred.Task(batch)
 				if err == nil {
-					all_tasks = append(all_tasks, task)
+					allTasks = append(allTasks, task)
 				}
 			} else {
 				err = x.processBatch(batch)
@@ -174,29 +183,29 @@ func (x *FeedParser) processTodo() error {
 		}
 	}
 	if len(batch) > 0 {
-		if PROCESS_TODO_DEFERRED {
+		if DEFERRED {
 			task, err = processBatchDeferred.Task(batch)
 			if err == nil {
-				all_tasks = append(all_tasks, task)
+				allTasks = append(allTasks, task)
 			}
 		} else {
 			err = x.processBatch(batch)
 		}
 	}
-	if PROCESS_TODO_DEFERRED && len(all_tasks) > 0 {
-		x.context.Infof("Adding %d task(s) to the default queue", len(all_tasks))
-		taskqueue.AddMulti(x.context, all_tasks, "default")
+	if DEFERRED && len(allTasks) > 0 {
+		x.context.Infof("Adding %d task(s) to the default queue", len(allTasks))
+		taskqueue.AddMulti(x.context, allTasks, "default")
 	}
 	return err
 }
 
-func (x *FeedParser) addRange(bottom, top int) {
+func (x *feedParser) addRange(bottom, top int) {
 	for i := bottom + 1; i < top; i++ {
 		x.todo = append(x.todo, i)
 	}
 }
 
-func (x *FeedParser) Search(bottom, top int) (err error) {
+func (x *feedParser) Search(bottom, top int) (err error) {
 	/*
 	  def infinite_length(bottom=1, top=-1):
 	    if bottom == 1 and not item_exists(1): return 0  # Starting edge case
@@ -215,40 +224,40 @@ func (x *FeedParser) Search(bottom, top int) (err error) {
 		x.addRange(bottom, top)
 		return nil
 	}
-	var full_stop, is_stop bool = false, false
+	var fullStop, isStop bool = false, false
 	if top < 0 { // Searching forward
 		top = bottom << 1 // Base 2 hops forward
-		is_stop, full_stop, err = x.isStop(top)
+		isStop, fullStop, err = x.isStop(top)
 		if err != nil {
 			return err
 		}
-		if !is_stop {
+		if !isStop {
 			x.addRange(bottom, top)
 			top, bottom = -1, top
 		}
 	} else { // Binary search between top and bottom
 		middle := (bottom + top) / 2
-		is_stop, full_stop, err = x.isStop(middle)
+		isStop, fullStop, err = x.isStop(middle)
 		if err != nil {
 			return err
 		}
-		if is_stop {
+		if isStop {
 			top = middle
 		} else {
 			x.addRange(bottom, middle)
 			bottom = middle
 		}
 	}
-	if full_stop {
+	if fullStop {
 		return nil
 	}
 	return x.Search(bottom, top) // TAIL RECURSION!!!
 }
 
-func (x *FeedParser) isStop(idx int) (is_stop, full_stop bool, err error) {
+func (x *feedParser) isStop(idx int) (isStop, fullStop bool, err error) {
 	// Gather posts as necessary
 	posts, err := x.getAndParseFeed(idx)
-	if err == FeedParse404Error {
+	if err == ErrFeedParse404 {
 		x.context.Infof("Reached the end of the feed list (%v)", idx)
 		return true, false, nil
 	}
@@ -258,28 +267,28 @@ func (x *FeedParser) isStop(idx int) (is_stop, full_stop bool, err error) {
 	}
 
 	// Check for Duplicates
-	store_count := 0
+	count := 0
 	for _, post := range posts {
-		id, _, err := guidToInt(post.Guid)
+		id, _, err := guidToInt(post.GUID)
 		if x.guids[id] || err != nil {
 			continue
 		}
-		store_count += 1
+		count++
 	}
 	x.posts = append(x.posts, posts...)
 
 	// Use store_count info to determine if isStop
-	is_stop = store_count == 0 || DEBUG
-	full_stop = len(posts) != store_count && store_count > 0
+	isStop = count == 0 || DEBUG
+	fullStop = len(posts) != count && count > 0
 	if DEBUG {
-		is_stop = idx > DEBUG_DEPTH
-		full_stop = idx == DEBUG_DEPTH
+		isStop = idx > DEPTH
+		fullStop = idx == DEPTH
 	}
 	return
 }
 
-func (x *FeedParser) getAndParseFeed(idx int) ([]models.Post, error) {
-	url := page_url(idx)
+func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
+	url := pageURL(idx)
 
 	// Get Response
 	x.context.Infof("Parsing index %v (%v)", idx, url)
@@ -290,7 +299,7 @@ func (x *FeedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		if resp.StatusCode == 404 {
-			return nil, FeedParse404Error
+			return nil, ErrFeedParse404
 		}
 		return nil, fmt.Errorf("Feed parcing recieved a %d Status Code", resp.StatusCode)
 	}
@@ -308,18 +317,18 @@ func (x *FeedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 	for idx := range feed.Items {
 		post := &feed.Items[idx]
 		for i, img := range post.Media {
-			post.Media[i].Url = stripQuery(img.Url)
+			post.Media[i].URL = stripQuery(img.URL)
 		}
-		post.MugShot = post.Media[0].Url
+		post.MugShot = post.Media[0].URL
 		post.Media = post.Media[1:]
 	}
 	return feed.Items, err
 }
 
-func (x *FeedParser) storePosts(dirty_posts []models.Post) (err error) {
-	posts := make([]models.Post, 0)
-	keys := make([]*datastore.Key, 0)
-	for _, post := range dirty_posts {
+func (x *feedParser) storePosts(dirty []models.Post) (err error) {
+	var posts []models.Post
+	var keys []*datastore.Key
+	for _, post := range dirty {
 		key, err := x.cleanPost(&post)
 		if err != nil {
 			continue
@@ -328,41 +337,41 @@ func (x *FeedParser) storePosts(dirty_posts []models.Post) (err error) {
 		keys = append(keys, key)
 	}
 	if len(keys) > 0 {
-		complete_keys, err := datastore.PutMulti(x.context, keys, posts)
+		complete, err := datastore.PutMulti(x.context, keys, posts)
 		if err == nil {
-			err = keycache.AddKeys(x.context, models.DB_POST_TABLE, complete_keys)
+			err = keycache.AddKeys(x.context, models.POST, complete)
 		}
 	}
 	return err
 }
 
-func (x *FeedParser) cleanPost(p *models.Post) (*datastore.Key, error) {
-	id, is_link_post, err := guidToInt(p.Guid)
+func (x *feedParser) cleanPost(p *models.Post) (*datastore.Key, error) {
+	id, link, err := guidToInt(p.GUID)
 	if err != nil {
 		return nil, err
 	}
 	// Remove link posts
-	if is_link_post {
-		x.context.Infof("Ignoring links post %v \"%v\"", p.Guid, p.Title)
+	if link {
+		x.context.Infof("Ignoring links post %v \"%v\"", p.GUID, p.Title)
 		return nil, fmt.Errorf("Ignoring links post")
 	}
 
 	// Detect video only posts
-	video_re := regexp.MustCompile("\\([^&]*Video.*\\)")
-	if video_re.MatchString(p.Title) {
-		x.context.Infof("Ignoring video post %v \"%v\"", p.Guid, p.Title)
+	video := regexp.MustCompile("\\([^&]*Video.*\\)")
+	if video.MatchString(p.Title) {
+		x.context.Infof("Ignoring video post %v \"%v\"", p.GUID, p.Title)
 		return nil, fmt.Errorf("Ignoring video post")
 	}
-	x.context.Infof("Storing post %v \"%v\"", p.Guid, p.Title)
+	x.context.Infof("Storing post %v \"%v\"", p.GUID, p.Title)
 
 	// Cleanup post titles
-	clean_re := regexp.MustCompile("\\W\\(([^\\)]*)\\)$")
-	p.Title = clean_re.ReplaceAllLiteralString(p.Title, "")
+	clean := regexp.MustCompile("\\W\\(([^\\)]*)\\)$")
+	p.Title = clean.ReplaceAllLiteralString(p.Title, "")
 
 	// Post
 	// temp_key := datastore.NewIncompleteKey(x.context, DB_POST_TABLE, nil)
-	temp_key := datastore.NewKey(x.context, models.DB_POST_TABLE, "", id, nil)
-	return temp_key, nil
+	key := datastore.NewKey(x.context, models.POST, "", id, nil)
+	return key, nil
 }
 
 func guidToInt(guid string) (int64, bool, error) {
@@ -373,17 +382,17 @@ func guidToInt(guid string) (int64, bool, error) {
 	}
 
 	// Parsing post id from guid url
-	temp_id, err := strconv.Atoi(url.Query().Get("p"))
+	id, err := strconv.Atoi(url.Query().Get("p"))
 	if err != nil {
 		return -1, false, err
 	}
-	return int64(temp_id), url.Query().Get("post_type") == "sdac_links", nil
+	return int64(id), url.Query().Get("post_type") == "sdac_links", nil
 }
 
-func stripQuery(dirty_url string) string {
-	obj, err := url.Parse(dirty_url)
+func stripQuery(dirty string) string {
+	obj, err := url.Parse(dirty)
 	if err != nil {
-		return dirty_url
+		return dirty
 	}
 	obj.RawQuery = ""
 	return obj.String()
