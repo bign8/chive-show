@@ -1,3 +1,4 @@
 package models
 
-const DB_POST_TABLE = "PostNew"
+// POST table to store posts in
+const POST = "Post"
