@@ -1,5 +1,5 @@
 application: crucial-alpha-706
-version: test
+version: 2-0-2
 runtime: go
 api_version: go1
 
