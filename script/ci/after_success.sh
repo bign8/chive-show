@@ -2,16 +2,20 @@
 
 set -e
 
-# export GAE_OAUTH=<your_oauth_token>
-# export GAE_DIR=../go_appengine
-# export APP_DIR=.
-echo "PR# $TRAVIS_PULL_REQUEST"
-# python $GAE_DIR/appcfg.py --oauth2_refresh_token=$GAE_OAUTH update $APP_DIR
-
+# Upload coverage
 codecov
 
-echo "SUCCESS!!!!"
+# Deploy to appengine
+if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+	echo "PR Build: Deploying to Appengine"
 
-echo "start coverage"
-cat coverage.txt
-echo "end coverage"
+	# TODO: make this version number the tag if it's a tagged build
+
+	export APP_DIR=.
+	export APP_VERSION="pr-$TRAVIS_PULL_REQUEST"
+	export GAE_DIR=../go_appengine
+
+	python $GAE_DIR/appcfg.py --oauth2_refresh_token=$GAE_OAUTH_REFRESH_TOKEN update $APP_DIR -V $APP_VERSION
+fi
+
+echo "SUCCESS!!!!"
