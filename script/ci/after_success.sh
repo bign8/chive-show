@@ -6,12 +6,16 @@ set -e
 codecov
 
 # Deploy to appengine
-export GAE_DIR=../go_appengine
-export APP_DIR=.
+if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+	echo "PR Build: Deploying to Appengine"
 
-# TODO: make this version number suck less (only deploy on PR builds, etc...)
-export APP_VERSION="$TRAVIS_BRANCH-$TRAVIS_PULL_REQUEST"
+	# TODO: make this version number the tag if it's a tagged build
 
-python $GAE_DIR/appcfg.py --oauth2_refresh_token=$GAE_OAUTH_REFRESH_TOKEN update $APP_DIR -V $APP_VERSION
+	export APP_DIR=.
+	export APP_VERSION="PR-$TRAVIS_PULL_REQUEST"
+	export GAE_DIR=../go_appengine
+
+	python $GAE_DIR/appcfg.py --oauth2_refresh_token=$GAE_OAUTH_REFRESH_TOKEN update $APP_DIR -V $APP_VERSION
+fi
 
 echo "SUCCESS!!!!"
