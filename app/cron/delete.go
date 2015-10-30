@@ -3,44 +3,46 @@ package cron
 // TODO: delete this file once feed versioning is a thing
 
 import (
-  "app/models"
-  "app/helpers/keycache"
-  "appengine"
-  "appengine/datastore"
-  "fmt"
-  "net/http"
+	"fmt"
+	"net/http"
+
+	"github.com/bign8/chive-show/app/helpers/keycache"
+	"github.com/bign8/chive-show/app/models"
+
+	"appengine"
+	"appengine/datastore"
 )
 
 func delete(w http.ResponseWriter, r *http.Request) {
-  c := appengine.NewContext(r)
+	c := appengine.NewContext(r)
 
-  // TODO: use helpers.keycache to help here
-  q := datastore.NewQuery(models.DB_POST_TABLE).KeysOnly()
-  keys, err := q.GetAll(c, nil)
-  if err != nil {
-    http.Error(w, err.Error(), http.StatusInternalServerError)
-    return
-  }
+	// TODO: use helpers.keycache to help here
+	q := datastore.NewQuery(models.POST).KeysOnly()
+	keys, err := q.GetAll(c, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-  // Batch Delete
-  var del_keys []*datastore.Key
-  for _, key := range keys {
-    if del_keys == nil {
-      del_keys = make([]*datastore.Key, 0)
-    }
-    del_keys = append(del_keys, key)
-    if len(del_keys) > 50 {
-      err = datastore.DeleteMulti(c, del_keys)
-      c.Infof("Deleting Keys %v", del_keys)
-      del_keys = nil
-    }
-    if err != nil {
-      http.Error(w, err.Error(), http.StatusInternalServerError)
-      return
-    }
-  }
-  if len(del_keys) > 0 {
-    err = datastore.DeleteMulti(c, del_keys)
-  }
-  fmt.Fprintf(w, "%v\n%v\nDeleted", err, keycache.ResetKeys(c, models.DB_POST_TABLE))
+	// Batch Delete
+	var delKeys []*datastore.Key
+	for _, key := range keys {
+		if delKeys == nil {
+			delKeys = make([]*datastore.Key, 0)
+		}
+		delKeys = append(delKeys, key)
+		if len(delKeys) > 50 {
+			err = datastore.DeleteMulti(c, delKeys)
+			c.Infof("Deleting Keys %v", delKeys)
+			delKeys = nil
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	if len(delKeys) > 0 {
+		err = datastore.DeleteMulti(c, delKeys)
+	}
+	fmt.Fprintf(w, "%v\n%v\nDeleted", err, keycache.ResetKeys(c, models.POST))
 }
