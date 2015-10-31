@@ -8,7 +8,7 @@ func (store *memStore) Create() error {
 	return nil
 }
 
-func (store *memStore) Read() error {
+func (store *memStore) Get() error {
 	return nil
 }
 
@@ -17,5 +17,9 @@ func (store *memStore) Update() error {
 }
 
 func (store *memStore) Delete() error {
+	return nil
+}
+
+func (store *memStore) Query() error {
 	return nil
 }

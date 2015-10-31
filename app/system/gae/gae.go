@@ -25,3 +25,7 @@ func (gae *gaeSystem) Store() system.Store {
 func (gae *gaeSystem) Fetch() *http.Client {
 	return nil
 }
+
+func (gae *gaeSystem) Defer() error {
+	return nil
+}

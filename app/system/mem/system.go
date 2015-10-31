@@ -17,3 +17,7 @@ func (mem *memSystem) Store() system.Store {
 func (mem *memSystem) Fetch() *http.Client {
 	return nil
 }
+
+func (mem *memSystem) Defer() error {
+	return nil
+}

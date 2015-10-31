@@ -10,14 +10,18 @@ type System interface {
 
 	// Fetch return client fetchers
 	Fetch() *http.Client
+
+	// Defer execute a function in deferred context
+	Defer() error
 }
 
 // Store deals with system persistant storage
 type Store interface {
 	Create() error
-	Read() error
+	Get() error
 	Update() error
 	Delete() error
+	Query() error
 }
 
 // TODO: make store much more robust!!!
