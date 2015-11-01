@@ -2,3 +2,4 @@ cron:
 - description: Parse feeds from source
   url: /cron/parse
   schedule: every 6 hours
+  target: cron
