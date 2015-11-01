@@ -11,7 +11,7 @@ import (
 
 const (
 	// DEBUG enable if troubleshooting algorithm
-	DEBUG = true
+	DEBUG = false
 
 	// DEPTH depth of feed mining
 	DEPTH = 3
@@ -41,6 +41,8 @@ type fetcher struct {
 }
 
 func (x *fetcher) Main() error {
+	defer close(x.res)
+
 	// Check first item edge case
 	if isStop, err := x.isStop(1); isStop || err != nil {
 		x.context.Infof("Fetcher: Finished without recursive searching %v", err)
@@ -49,6 +51,7 @@ func (x *fetcher) Main() error {
 
 	// Defer as many todo workers as necessary
 	x.todo = make(chan int)
+	defer close(x.todo)
 	go x.processTODO()
 	return x.Search(1, -1)
 }
@@ -70,7 +73,6 @@ func (x *fetcher) Search(bottom, top int) (err error) {
 	if bottom == top-1 {
 		x.context.Infof("Fetcher: TOP OF RANGE FOUND! @%d", top)
 		x.addRange(bottom, top)
-		close(x.res)
 		return nil
 	}
 	x.context.Infof("Fetcher: Search(%d, %d)", bottom, top)
@@ -81,7 +83,6 @@ func (x *fetcher) Search(bottom, top int) (err error) {
 		top = bottom << 1 // Base 2 hops forward
 		isStop, err = x.isStop(top)
 		if err != nil {
-			close(x.res)
 			return err
 		}
 		if !isStop {
@@ -94,7 +95,6 @@ func (x *fetcher) Search(bottom, top int) (err error) {
 		middle := (bottom + top) / 2
 		isStop, err = x.isStop(middle)
 		if err != nil {
-			close(x.res)
 			return err
 		}
 		if isStop {
@@ -150,6 +150,7 @@ func (x *fetcher) addRange(bottom, top int) {
 
 func (x *fetcher) processTODO() {
 	for idx := range x.todo {
-		x.isStop(idx)
+		x.context.Infof("Fetcher: NOT processing TODO %d", idx)
+		//x.isStop(idx)
 	}
 }
