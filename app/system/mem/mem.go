@@ -10,7 +10,7 @@ import (
 func New(_ interface{}) system.System {
 	log.Printf("Creating new System store")
 	store := memStore{
-		data: make(map[string]string),
+		data: make(map[system.Key]interface{}),
 	}
 	return &memSystem{
 		store: store,

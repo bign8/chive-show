@@ -1,6 +1,9 @@
 package system
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+)
 
 // System interface for underlying system implementations
 type System interface {
@@ -12,16 +15,35 @@ type System interface {
 	Fetch() *http.Client
 
 	// Defer execute a function in deferred context
-	Defer() error
+	// Defer() error
 }
+
+// ErrDoesNotExist if item key does not exist
+var ErrDoesNotExist = errors.New("Item does not exist")
 
 // Store deals with system persistant storage
 type Store interface {
-	Create() error
-	Get() error
-	Update() error
-	Delete() error
+	// Get returns item to dst if found
+	Get(*Key, interface{}) error
+
+	// GetMulti populates dst if keys found
+	GetMulti([]*Key, []interface{}) error
+
+	// Put stores item
+	Put(*Key, interface{}) error
+
+	// PutMulti stores items
+	PutMulti([]*Key, []interface{}) error
+
+	// Delete removes item
+	Delete(*Key) error
+
+	// DeleteMulti removes multiple items
+	DeleteMulti([]*Key) error
+
+	// Query TODO: yeah...
 	Query() error
 }
 
-// TODO: make store much more robust!!!
+// Key is type of an item key
+type Key string
