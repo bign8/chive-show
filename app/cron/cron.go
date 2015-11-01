@@ -41,6 +41,9 @@ func Init() {
 	http.Handle("/cron/crawl2", appstats.NewHandler(crawler.Crawl2))
 	http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
 	http.HandleFunc("/cron/delete", delete)
+	http.HandleFunc("/_ah/start", func(w http.ResponseWriter, r *http.Request) {
+
+	})
 }
 
 var (
