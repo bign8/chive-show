@@ -7,15 +7,15 @@ import (
 )
 
 // UnPager process pages of posts to individual posts
-func UnPager(c appengine.Context, pages <-chan string) <-chan string {
-	res := make(chan string)
+func UnPager(c appengine.Context, pages <-chan string) <-chan Data {
+	res := make(chan Data)
 
 	// TODO: spin up as many unpages as desired
 	go runUnPager(c, pages, res)
 	return res
 }
 
-func runUnPager(c appengine.Context, in <-chan string, out chan<- string) {
+func runUnPager(c appengine.Context, in <-chan string, out chan<- Data) {
 	defer close(out)
 
 	var miner struct {
@@ -34,7 +34,10 @@ func runUnPager(c appengine.Context, in <-chan string, out chan<- string) {
 
 		for _, post := range miner.Item {
 			c.Infof("UnPager: Found Post %s", post.KEY)
-			out <- post.XML
+			out <- Data{
+				KEY: post.KEY,
+				XML: post.XML,
+			}
 		}
 	}
 }

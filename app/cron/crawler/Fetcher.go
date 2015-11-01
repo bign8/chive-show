@@ -9,14 +9,6 @@ import (
 	"appengine/urlfetch"
 )
 
-const (
-	// DEBUG enable if troubleshooting algorithm
-	DEBUG = true
-
-	// DEPTH depth of feed mining
-	DEPTH = 1
-)
-
 func pageURL(idx int) string {
 	return fmt.Sprintf("http://thechive.com/feed/?paged=%d", idx)
 }

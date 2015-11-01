@@ -1,11 +1,11 @@
 package crawler
 
 // Batcher takes input and batches to given sizes
-func Batcher(in <-chan string, size int) <-chan []string {
-	out := make(chan []string)
+func Batcher(in <-chan Data, size int) <-chan []Data {
+	out := make(chan []Data)
 	go func() {
 		defer close(out)
-		batch := make([]string, size)
+		batch := make([]Data, size)
 		count := 0
 		for post := range in {
 			batch[count] = post
@@ -13,7 +13,7 @@ func Batcher(in <-chan string, size int) <-chan []string {
 			if count >= size {
 				count = 0
 				out <- batch
-				batch = make([]string, size) // allocate another chunk of memory
+				batch = make([]Data, size) // allocate another chunk of memory
 			}
 		}
 		if count > 0 {
