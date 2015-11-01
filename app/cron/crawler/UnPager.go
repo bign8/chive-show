@@ -1,10 +1,16 @@
 package crawler
 
-import "appengine"
+import (
+	"encoding/xml"
+
+	"appengine"
+)
 
 // UnPager process pages of posts to individual posts
 func UnPager(c appengine.Context, pages <-chan string) <-chan string {
 	res := make(chan string)
+
+	// TODO: spin up as many unpages as desired
 	go runUnPager(c, pages, res)
 	return res
 }
@@ -12,9 +18,23 @@ func UnPager(c appengine.Context, pages <-chan string) <-chan string {
 func runUnPager(c appengine.Context, in <-chan string, out chan<- string) {
 	defer close(out)
 
-	for page := range in {
-		c.Infof("Retrieved Page %s", page)
+	var miner struct {
+		Item []struct {
+			KEY string `xml:"guid"`
+			XML string `xml:",innerxml"`
+		} `xml:"channel>item"`
+	}
 
-		// TODO: decompress page
+	for page := range in {
+		c.Infof("UnPager: Retrieved Page")
+
+		if err := xml.Unmarshal([]byte(page), &miner); err != nil {
+			c.Errorf("UnPager: Error %s", err)
+		}
+
+		for _, post := range miner.Item {
+			c.Infof("UnPager: Found Post %s", post.KEY)
+			out <- post.XML
+		}
 	}
 }

@@ -11,10 +11,10 @@ import (
 
 const (
 	// DEBUG enable if troubleshooting algorithm
-	DEBUG = false
+	DEBUG = true
 
 	// DEPTH depth of feed mining
-	DEPTH = 3
+	DEPTH = 1
 )
 
 func pageURL(idx int) string {

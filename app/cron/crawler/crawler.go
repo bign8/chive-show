@@ -26,7 +26,7 @@ type chivePostMiner struct {
 }
 
 func Crawl(c appengine.Context, w http.ResponseWriter, r *http.Request) {
-	url := pageURL(9999)
+	url := pageURL(1)
 
 	// Get Response
 	c.Infof("Parsing index 0 (%v)", url)
@@ -79,11 +79,12 @@ func Crawl(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func Crawl2(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+	// fetcher, dePager, parser, batcher, saver
 	pages := Fetcher(c)
-	for _ = range pages {
-		c.Infof("Found page")
+	posts := UnPager(c, pages)
+	for post := range posts {
+		c.Infof("Post: %v", post)
 	}
-	// posts := UnPager(c, pages)
 	// batch := Batcher(posts, 20)
 	// Storage(c, batch)
 }
