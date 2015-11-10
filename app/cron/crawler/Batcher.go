@@ -1,8 +1,10 @@
 package crawler
 
+import "appengine"
+
 // Batcher takes input and batches to given sizes
-func Batcher(in <-chan Data, size int) <-chan []Data {
-	out := make(chan []Data)
+func Batcher(c appengine.Context, in <-chan Data, size int) <-chan []Data {
+	out := make(chan []Data, 10000)
 	go func() {
 		defer close(out)
 		batch := make([]Data, size)
@@ -16,6 +18,7 @@ func Batcher(in <-chan Data, size int) <-chan []Data {
 				batch = make([]Data, size) // allocate another chunk of memory
 			}
 		}
+		c.Infof("Batcher: Finished Batching")
 		if count > 0 {
 			out <- batch[:count]
 		}

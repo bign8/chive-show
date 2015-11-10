@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
+	"time"
 
 	"appengine"
 	"appengine/urlfetch"
@@ -14,25 +16,25 @@ func pageURL(idx int) string {
 }
 
 // Fetcher returns stream of un-processed xml posts
-func Fetcher(c appengine.Context) <-chan string {
-	res := make(chan string)
+func Fetcher(c appengine.Context, workers int) <-chan Data {
+	res := make(chan Data, 100)
 	worker := &fetcher{
 		res:     res,
 		context: c,
 		client:  urlfetch.Client(c),
 	}
-	go worker.Main()
+	go worker.Main(workers)
 	return res
 }
 
 type fetcher struct {
-	res     chan<- string
+	res     chan<- Data
 	context appengine.Context
 	client  *http.Client
 	todo    chan int
 }
 
-func (x *fetcher) Main() error {
+func (x *fetcher) Main(workers int) error {
 	defer close(x.res)
 
 	// Check first item edge case
@@ -42,10 +44,24 @@ func (x *fetcher) Main() error {
 	}
 
 	// Defer as many todo workers as necessary
-	x.todo = make(chan int)
-	defer close(x.todo)
-	go x.processTODO()
-	return x.Search(1, -1)
+	x.todo = make(chan int, 1000)
+
+	// Number of batch fetchers to process
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		go func(idx int) {
+			x.processTODO()
+			wg.Done()
+		}(i)
+	}
+	wg.Add(workers)
+
+	err := x.Search(1, -1)
+
+	// wait for processTODOs to finish
+	wg.Wait()
+	x.context.Infof("Complete with FETCHING")
+	return err
 }
 
 func (x *fetcher) Search(bottom, top int) (err error) {
@@ -65,6 +81,7 @@ func (x *fetcher) Search(bottom, top int) (err error) {
 	if bottom == top-1 {
 		x.context.Infof("Fetcher: TOP OF RANGE FOUND! @%d", top)
 		x.addRange(bottom, top)
+		close(x.todo)
 		return nil
 	}
 	x.context.Infof("Fetcher: Search(%d, %d)", bottom, top)
@@ -106,8 +123,9 @@ func (x *fetcher) isStop(idx int) (isStop bool, err error) {
 	x.context.Infof("Fetcher: Fetching %s", url)
 	resp, err := x.client.Get(url)
 	if err != nil {
-		x.context.Errorf("Fetcher: Error decoding ChiveFeed: %s", err)
-		return true, err
+		x.context.Errorf("Fetcher: Error decoding ChiveFeed (1s sleep): %s", err)
+		time.Sleep(time.Second)
+		return x.isStop(idx) // Tail recursion (this loop may get us into trouble)
 	}
 	defer resp.Body.Close()
 
@@ -125,7 +143,10 @@ func (x *fetcher) isStop(idx int) (isStop bool, err error) {
 	if err != nil {
 		return true, err
 	}
-	x.res <- string(contents)
+	x.res <- Data{
+		KEY: url,
+		XML: string(contents),
+	}
 
 	// Use store_count info to determine if isStop
 	if DEBUG {
@@ -142,7 +163,7 @@ func (x *fetcher) addRange(bottom, top int) {
 
 func (x *fetcher) processTODO() {
 	for idx := range x.todo {
-		x.context.Infof("Fetcher: NOT processing TODO %d", idx)
-		//x.isStop(idx)
+		// x.context.Infof("Fetcher: NOT processing TODO %d", idx)
+		x.isStop(idx)
 	}
 }

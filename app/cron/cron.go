@@ -37,11 +37,13 @@ const (
 
 // Init initializes cron handlers
 func Init() {
-	http.Handle("/cron/crawl", appstats.NewHandler(crawler.Crawl))
+	http.HandleFunc("/cron/crawl", crawler.Crawl)
+	http.Handle("/cron/stats", appstats.NewHandler(crawler.Stats))
+
 	http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
 	http.HandleFunc("/cron/delete", delete)
 	http.HandleFunc("/_ah/start", func(w http.ResponseWriter, r *http.Request) {
-
+		fmt.Fprintf(w, "Here boys")
 	})
 }
 
