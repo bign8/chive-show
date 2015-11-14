@@ -35,15 +35,39 @@ const (
 	DEFERRED = true
 )
 
+func cleanup(c appengine.Context, name string) error {
+	q := datastore.NewQuery(name).KeysOnly()
+	keys, err := q.GetAll(c, nil)
+	s := 100
+	for len(keys) > 0 {
+		if len(keys) < 100 {
+			s = len(keys)
+		}
+		err = datastore.DeleteMulti(c, keys[:s])
+		keys = keys[s:]
+	}
+	return err
+}
+
 // Init initializes cron handlers
 func Init() {
-	http.HandleFunc("/cron/crawl", crawler.Crawl)
+	http.HandleFunc("/cron/stage/1", crawler.Crawl)
+	http.HandleFunc("/cron/stage/2", crawler.UnPage)
+	http.HandleFunc("/cron/stage/2/clean", func(w http.ResponseWriter, r *http.Request) {
+		c := appengine.NewContext(r)
+		cleanup(c, "edge")
+		cleanup(c, "vertex")
+		cleanup(c, "post")
+	})
 	http.Handle("/cron/stats", appstats.NewHandler(crawler.Stats))
 
-	http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
-	http.HandleFunc("/cron/delete", delete)
+	// http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
+	// http.HandleFunc("/cron/delete", delete)
 	http.HandleFunc("/_ah/start", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Here boys")
+		fmt.Fprintf(w, "Start")
+	})
+	http.HandleFunc("/_ah/stop", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Stop")
 	})
 }
 

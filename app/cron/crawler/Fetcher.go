@@ -16,8 +16,8 @@ func pageURL(idx int) string {
 }
 
 // Fetcher returns stream of un-processed xml posts
-func Fetcher(c appengine.Context, workers int) <-chan Data {
-	res := make(chan Data, 100)
+func Fetcher(c appengine.Context, workers int) <-chan interface{} {
+	res := make(chan interface{}, 100)
 	worker := &fetcher{
 		res:     res,
 		context: c,
@@ -28,7 +28,7 @@ func Fetcher(c appengine.Context, workers int) <-chan Data {
 }
 
 type fetcher struct {
-	res     chan<- Data
+	res     chan<- interface{}
 	context appengine.Context
 	client  *http.Client
 	todo    chan int

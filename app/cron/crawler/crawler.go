@@ -20,8 +20,11 @@ const (
 	// DEPTH depth of feed mining
 	DEPTH = 1
 
-	// XML name of where xml posts are stored
+	// XML name of where xml posts pages are stored
 	XML = "xml"
+
+	// POST name of where xml posts are stored
+	POST = "post"
 )
 
 type Data struct {
@@ -38,7 +41,7 @@ func Crawl(w http.ResponseWriter, r *http.Request) {
 	pages := Fetcher(c, fetchers)
 	// posts := UnPager(c, pages, pagers)
 	batch := Batcher(c, pages, 10)
-	Storage(c, batch, storers)
+	Storage(c, batch, storers, XML)
 
 	fmt.Fprint(w, "Crawl Complete!")
 }
