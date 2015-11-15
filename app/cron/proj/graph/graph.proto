@@ -1,4 +1,4 @@
-package main;
+package graph;
 
 message SerialGraph {
 	repeated Node nodes = 1;

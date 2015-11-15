@@ -12,7 +12,7 @@ It has these top-level messages:
 	SerialGraph
 	Node
 */
-package main
+package graph
 
 import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
