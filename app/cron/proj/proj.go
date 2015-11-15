@@ -2,8 +2,6 @@ package proj
 
 import (
 	"encoding/xml"
-	"log"
-	"sync"
 
 	"appengine"
 	"appengine/datastore"
@@ -30,17 +28,22 @@ type Item struct {
 	Imgs []string
 }
 
-// TODO: improve pulling performance (cache number of xml in stage_1, fan out pulling)
-func puller(c appengine.Context) <-chan []byte {
-	out := make(chan []byte, 10000)
+func getItems(c appengine.Context) <-chan interface{} {
+	pages := puller(c)
+	return chain.FanOut(50, 10000, pages, flatten(c))
+}
 
+func puller(c appengine.Context) <-chan interface{} {
+	out := make(chan interface{}, 10000)
+
+	// TODO: improve pulling performance (cache number of xml in stage_1, fan out pulling)
 	go func() {
 		defer close(out)
 		q := datastore.NewQuery(crawler.XML)
-		t := q.Run(c)
+		iterator := q.Run(c)
 		for {
 			var s crawler.Store
-			_, err := t.Next(&s)
+			_, err := iterator.Next(&s)
 			if err == datastore.Done {
 				break // No further entities match the query.
 			}
@@ -54,65 +57,24 @@ func puller(c appengine.Context) <-chan []byte {
 	return out
 }
 
-func flatten(c appengine.Context, in <-chan []byte) <-chan Item {
-	const WORKERS = 100
-	out := make(chan Item, 10000)
-	var wg sync.WaitGroup
-	wg.Add(WORKERS)
-	for i := 0; i < WORKERS; i++ {
-		go func(idx int) {
-			flattenWorker(c, in, out, idx)
-			wg.Done()
-		}(i)
-	}
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-	return out
-}
+func flatten(c appengine.Context) chain.Worker {
+	return func(obj interface{}, out chan<- interface{}, idx int) {
+		var xmlPage XMLPage
+		var imgs []string
 
-func flattenWorker(c appengine.Context, in <-chan []byte, out chan<- Item, idx int) {
-	var xmlPage XMLPage
-	var imgs []string
-
-	for data := range in {
-		if err := xml.Unmarshal(data, &xmlPage); err != nil {
+		// Parse the XML of an object
+		if err := xml.Unmarshal(obj.([]byte), &xmlPage); err != nil {
 			c.Errorf("Flatten %d: %v", idx, err)
-			continue
+			return
 		}
+
+		// Process items in a particular page
 		for _, item := range xmlPage.Items {
 			imgs = make([]string, len(item.Imgs))
 			for i, img := range item.Imgs {
 				imgs[i] = img.URL
 			}
-
-			out <- Item{
-				GUID: item.GUID,
-				Tags: item.Tags,
-				Imgs: imgs,
-			}
+			out <- Item{item.GUID, item.Tags, imgs}
 		}
-	}
-}
-
-func doMagic() {
-	start := make(chan interface{}, 10)
-	out := chain.FanOut(10, 10, start, worker)
-	go func() {
-		for o := range out {
-			log.Printf("Something: %v", o)
-		}
-	}()
-	start <- 1
-	start <- 2
-	start <- 3
-}
-
-func worker(in <-chan interface{}, out chan<- interface{}, idx int) {
-	var bytes []byte
-	for x := range in {
-		bytes = x.([]byte)
-		out <- bytes
 	}
 }

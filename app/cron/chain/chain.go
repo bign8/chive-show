@@ -3,7 +3,7 @@ package chain
 import "sync"
 
 // Worker is a function designed to fan out and perform work on a piece of Data
-type Worker func(in <-chan interface{}, out chan<- interface{}, idx int)
+type Worker func(obj interface{}, out chan<- interface{}, idx int)
 
 // FanOut allows lengthy workers to fan out on chanel operations
 func FanOut(count int, buff int, in <-chan interface{}, doIt Worker) <-chan interface{} {
@@ -12,7 +12,9 @@ func FanOut(count int, buff int, in <-chan interface{}, doIt Worker) <-chan inte
 	wg.Add(count)
 	for i := 0; i < count; i++ {
 		go func(idx int) {
-			doIt(in, out, idx)
+			for obj := range in {
+				doIt(obj, out, idx)
+			}
 			wg.Done()
 		}(i)
 	}
