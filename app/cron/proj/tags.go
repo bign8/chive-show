@@ -22,6 +22,7 @@ func Tags(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		c.Infof("Time took: %v", time.Since(start))
 	}()
+	// w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 
 	// Check from memcache
 	if item, err := memcache.Get(c, tagsMemcacheKey); err == nil {
@@ -39,22 +40,45 @@ func Tags(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 		found[tag.(string)]++
 	}
 
+	// Compute average (used to clip data, so it's not huge)
+	avg := int64(0)
+	for _, value := range found {
+		avg += value
+	}
+	avg /= int64(len(found))
+	c.Infof("Num tags: %v; Avg: %v", len(found), avg)
+
+	// Compute the 75%-tile
+	cap := int64(0)
+	for key, value := range found {
+		if avg <= value {
+			cap += value
+		} else {
+			delete(found, key)
+		}
+	}
+	cap /= int64(len(found))
+	c.Infof("Above average tags: %v; 75%%-tile: %v", len(found), cap)
+
 	// Output results
 	var buffer bytes.Buffer
+	result := int64(0)
 	for key, value := range found {
-		buffer.WriteString(fmt.Sprintf("%s,%d\n", key, value))
+		if cap <= value {
+			buffer.WriteString(fmt.Sprintf("%s,%d\n", key, value))
+			result++
+		}
 	}
-	data := buffer.String()
-
-	fmt.Fprint(w, data)
-	c.Infof("Num tags: %v", len(found))
+	data := buffer.Bytes()
+	w.Write(data)
+	c.Infof("Returned tags: %v", result)
 
 	// Save to memcache, but only wait up to 3ms.
 	done := make(chan bool, 1)
 	go func() {
 		memcache.Set(c, &memcache.Item{
 			Key:   tagsMemcacheKey,
-			Value: []byte(data),
+			Value: data,
 		})
 		done <- true
 	}()
@@ -71,7 +95,7 @@ func tags(obj interface{}, out chan<- interface{}, idx int) {
 }
 
 // http://xpo6.com/list-of-english-stop-words/
-var chiveWords = "web only,"
+var chiveWords = "web only,thebrigade,theberry,thechive,chive,chive humanity,"
 var stopWords = chiveWords + "a,able,about,across,after,all,almost,also,am,among,an,and,any,are,as,at,be,because,been,but,by,can,cannot,could,dear,did,do,does,either,else,ever,every,for,from,get,got,had,has,have,he,her,hers,him,his,how,however,i,if,in,into,is,it,its,just,least,let,like,likely,may,me,might,most,must,my,neither,no,nor,not,of,off,often,on,only,or,other,our,own,rather,said,say,says,she,should,since,so,some,than,that,the,their,them,then,there,these,they,this,tis,to,too,twas,us,wants,was,we,were,what,when,where,which,while,who,whom,why,will,with,would,yet,you,your"
 var stops = map[string]bool{}
 
