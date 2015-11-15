@@ -16,6 +16,10 @@ handlers:
   script: _go_app
   login: admin
 
+- url: /proj/.*
+  script: _go_app
+  login: admin
+
 error_handlers:
   - file: err/default.html
   - error_code: over_quota
