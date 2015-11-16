@@ -3,7 +3,7 @@ package sharder
 import (
 	"bytes"
 	"errors"
-	"time"
+	"sync"
 
 	"appengine"
 	"appengine/datastore"
@@ -16,7 +16,6 @@ func NewWriter(c appengine.Context, name string) (*Writer, error) {
 	}
 	return &Writer{
 		ctx:  c,
-		key:  nil,
 		buff: bytes.NewBufferString(""),
 		name: name,
 	}, nil
@@ -26,7 +25,6 @@ func NewWriter(c appengine.Context, name string) (*Writer, error) {
 type Writer struct {
 	buff *bytes.Buffer
 	ctx  appengine.Context
-	key  *ShardKey
 	name string
 }
 
@@ -41,7 +39,8 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 // Close finishes off the current buffer, shards and stores the data.
 // Once Close is called, the user may call Key to get the key of the stored object.
 func (w *Writer) Close() error {
-	// TODO: datastore.RunInTransaction + go-routines with waitGroups
+	// TODO: datastore.RunInTransaction
+	// TODO: delete existing shards greater than current
 
 	length := w.buff.Len()
 	shards := (length-1)/divisor + 1
@@ -49,11 +48,7 @@ func (w *Writer) Close() error {
 
 	// Store shardMaster
 	master := shardMaster{
-		Name:   w.name,
-		Stamp:  time.Now(),
-		Shards: shards,
-		MD5:    "TO-IMPLEMENT",
-		Size:   length,
+		Size: length,
 	}
 	if _, err := datastore.Put(w.ctx, key, &master); err != nil {
 		panic(err)
@@ -62,30 +57,25 @@ func (w *Writer) Close() error {
 
 	// shard data and store shards
 	data := w.buff.Bytes()
+	var wg sync.WaitGroup
+	wg.Add(shards)
 	for i := 0; i < shards; i++ {
-		shardKey := shardKey(w.ctx, w.name, i)
-		shardData := data[i*divisor:]
-		if len(shardData) > divisor {
-			shardData = data[:divisor]
-		}
-		s := shard{shardData}
-		w.ctx.Infof("Inn Data %d: %q", i, s.Data)
-		if _, err := datastore.Put(w.ctx, shardKey, &s); err != nil {
-			panic(err)
-			return err
-		}
+		go func(i int) {
+			shardKey := shardKey(w.ctx, w.name, i)
+			shardData := data[i*divisor:]
+			if len(shardData) > divisor {
+				shardData = data[:divisor]
+			}
+			s := shard{shardData}
+			// w.ctx.Infof("Inn Data %d: %q", i, s.Data)
+			if _, err := datastore.Put(w.ctx, shardKey, &s); err != nil {
+				panic(err)
+			}
+			wg.Done()
+		}(i)
 	}
 
-	w.key = new(ShardKey)
-	*w.key = ShardKey(key.Encode())
+	wg.Wait()
 	w.buff = nil
 	return nil
-}
-
-// Key returns the key of the sharded data.  Note: will return an error if not Closed.
-func (w *Writer) Key() (*ShardKey, error) {
-	if w.key == nil {
-		return nil, errors.New("Writer must be closed before a Key is available")
-	}
-	return w.key, nil
 }
