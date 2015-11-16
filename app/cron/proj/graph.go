@@ -2,6 +2,7 @@ package proj
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"appengine"
@@ -12,33 +13,26 @@ import (
 
 // TestShard to delete
 func TestShard(c appengine.Context, w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
 
+	// Writing
+	start := time.Now()
 	s, err := sharder.NewWriter(c, "test")
 	if err != nil {
 		c.Errorf("Writer Error: %s", err)
 		return
 	}
-
-	s.Write([]byte("012345678901234567890"))
+	s.Write([]byte(strings.Repeat("01234567890123456789", 1e6)))
 	s.Close()
-
-	key, err := s.Key()
-	if err != nil {
-		c.Errorf("Error in Key: %s", err)
-	}
-	c.Infof("Has Key: %s", key)
-
 	c.Infof("Write took: %v", time.Since(start))
-	start = time.Now()
 
+	// Reading
+	start = time.Now()
 	read, err := sharder.Reader(c, "test")
 	if err != nil {
 		c.Errorf("Reader Error: %s", err)
 		return
 	}
-	c.Infof("Data: %q", read.String())
-
+	c.Infof("Data Length: %d", read.Len())
 	c.Infof("Read took: %v", time.Since(start))
 }
 

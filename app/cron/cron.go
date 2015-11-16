@@ -50,12 +50,14 @@ func Init() {
 	http.Handle("/proj/graph", appstats.NewHandler(proj.Graph))
 	http.Handle("/proj/shard", appstats.NewHandler(proj.TestShard))
 
-	http.HandleFunc("/clean", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/cron/clean", func(w http.ResponseWriter, r *http.Request) {
 		c := appengine.NewContext(r)
 		cleanup(c, "buff")
 		cleanup(c, "edge")
 		cleanup(c, "vertex")
 		cleanup(c, "post")
+		cleanup(c, "shard-pieces")
+		cleanup(c, "shard-master")
 	})
 
 	http.Handle("/cron/stats", appstats.NewHandler(crawler.Stats))

@@ -12,7 +12,7 @@ import (
 const (
 	masterKind = "shard-master"
 	shardKind  = "shard-pieces"
-	divisor    = 10 // 9e6
+	divisor    = 1e6 // 1MB
 )
 
 // ErrInvalidName because reasons
