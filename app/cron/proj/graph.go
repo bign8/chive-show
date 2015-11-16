@@ -7,7 +7,40 @@ import (
 	"appengine"
 
 	"github.com/bign8/chive-show/app/cron/proj/graph"
+	"github.com/bign8/chive-show/app/helpers/sharder"
 )
+
+// TestShard to delete
+func TestShard(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+
+	s, err := sharder.NewWriter(c, "test")
+	if err != nil {
+		c.Errorf("Writer Error: %s", err)
+		return
+	}
+
+	s.Write([]byte("012345678901234567890"))
+	s.Close()
+
+	key, err := s.Key()
+	if err != nil {
+		c.Errorf("Error in Key: %s", err)
+	}
+	c.Infof("Has Key: %s", key)
+
+	c.Infof("Write took: %v", time.Since(start))
+	start = time.Now()
+
+	read, err := sharder.Reader(c, "test")
+	if err != nil {
+		c.Errorf("Reader Error: %s", err)
+		return
+	}
+	c.Infof("Data: %q", read.String())
+
+	c.Infof("Read took: %v", time.Since(start))
+}
 
 // Graph processes all posts in attempt to create a graph
 func Graph(c appengine.Context, w http.ResponseWriter, r *http.Request) {
@@ -62,22 +95,27 @@ func Graph(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	c.Infof("Nodes (ALL): %d", total)
 
 	// w/dupes w/invalid tags
-	// 2015/11/15 20:52:26 INFO: Nodes (IMG): 928728
-	// 2015/11/15 20:52:26 INFO: Nodes (TAG): 244212
-	// 2015/11/15 20:52:26 INFO: Nodes (POST): 40920
-	// 2015/11/15 20:52:26 INFO: Time took: 31.310686059s
+	// INFO: Nodes (IMG): 928728
+	// INFO: Nodes (TAG): 244212
+	// INFO: Nodes (POST): 40920
+	// INFO: Nodes (ALL): 1213860
+	// INFO: Time took: 31.310686059s
 
 	// w/dupes w/o invalid Tags
-	// 2015/11/15 21:03:06 INFO: Nodes (IMG): 928728
-	// 2015/11/15 21:03:06 INFO: Nodes (TAG): 237122
-	// 2015/11/15 21:03:06 INFO: Nodes (POST): 40920
-	// 2015/11/15 21:03:06 INFO: Time took: 31.850210891s
+	// INFO: Nodes (IMG): 928728
+	// INFO: Nodes (TAG): 237122
+	// INFO: Nodes (POST): 40920
+	// INFO: Nodes (ALL): 1206770
+	// INFO: Time took: 31.850210891s
 
 	// w/o dupes w/o invalid Tags
-	// 2015/11/15 21:06:18 INFO: Nodes (IMG): 886831
-	// 2015/11/15 21:06:18 INFO: Nodes (POST): 40920
-	// 2015/11/15 21:06:18 INFO: Nodes (TAG): 18221
-	// 2015/11/15 21:06:18 INFO: Time took: 32.651739532s
+	// INFO: Nodes (IMG): 886831
+	// INFO: Nodes (POST): 40920
+	// INFO: Nodes (TAG): 18221
+	// INFO: Nodes (ALL): 945972
+	// INFO: Time took: 32.651739532s
+
+	// TODO: write to sharded datastore entity
 
 	c.Infof("Time took: %v", time.Since(start))
 }

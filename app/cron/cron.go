@@ -48,6 +48,7 @@ func Init() {
 
 	http.Handle("/proj/tags", appstats.NewHandler(proj.Tags))
 	http.Handle("/proj/graph", appstats.NewHandler(proj.Graph))
+	http.Handle("/proj/shard", appstats.NewHandler(proj.TestShard))
 
 	http.HandleFunc("/clean", func(w http.ResponseWriter, r *http.Request) {
 		c := appengine.NewContext(r)

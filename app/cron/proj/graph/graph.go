@@ -50,10 +50,12 @@ func (g *Graph) Add(value string, ttype NodeType, weight int64) *Node {
 	g.s.Nodes = append(g.s.Nodes, n)
 
 	// Add dupe check to list
-	if g.dupes[ttype] == nil {
-		g.dupes[ttype] = make(map[string]*Node)
+	dub, ok := g.dupes[ttype]
+	if !ok {
+		dub = make(map[string]*Node)
+		g.dupes[ttype] = dub
 	}
-	g.dupes[ttype][value] = n
+	dub[value] = n
 	return n
 }
 
