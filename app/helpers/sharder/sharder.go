@@ -8,6 +8,11 @@ import (
 	"appengine/datastore"
 )
 
+// TODO: datastore.RunInTransaction
+// TODO: delete existing shards greater than current
+// TODO: don't panic and actually use error chans
+// TODO: possibly use put and get multi for up to 10MB
+
 const (
 	masterKind = "shard-master"
 	shardKind  = "shard-pieces"
@@ -23,6 +28,10 @@ func masterKey(c appengine.Context, name string) *datastore.Key {
 
 func shardKey(c appengine.Context, name string, idx int) *datastore.Key {
 	return datastore.NewKey(c, shardKind, fmt.Sprintf("%s-%d", name, idx), 0, nil)
+}
+
+func numShards(size int) int {
+	return (size-1)/divisor + 1
 }
 
 type shardMaster struct {

@@ -1,6 +1,7 @@
 package proj
 
 import (
+	"bytes"
 	"net/http"
 	"strings"
 	"time"
@@ -14,15 +15,15 @@ import (
 // TestShard to delete
 func TestShard(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 
+	data := []byte(strings.Repeat("01234567890123456789", 1e6))
+
 	// Writing
 	start := time.Now()
-	s, err := sharder.NewWriter(c, "test")
+	err := sharder.Writer(c, "test", data)
 	if err != nil {
 		c.Errorf("Writer Error: %s", err)
 		return
 	}
-	s.Write([]byte(strings.Repeat("01234567890123456789", 1e6)))
-	s.Close()
 	c.Infof("Write took: %v", time.Since(start))
 
 	// Reading
@@ -32,7 +33,7 @@ func TestShard(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 		c.Errorf("Reader Error: %s", err)
 		return
 	}
-	c.Infof("Data Length: %d", read.Len())
+	c.Infof("Data Length: %d; isSame: %v", len(read), bytes.Equal(read, data))
 	c.Infof("Read took: %v", time.Since(start))
 }
 

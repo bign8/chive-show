@@ -1,7 +1,6 @@
 package sharder
 
 import (
-	"bytes"
 	"sync"
 
 	"appengine"
@@ -9,7 +8,7 @@ import (
 )
 
 // Reader creates a new shard reader to retrieve data from datastore
-func Reader(c appengine.Context, name string) (*bytes.Buffer, error) {
+func Reader(c appengine.Context, name string) ([]byte, error) {
 	if name == "" {
 		return nil, ErrInvalidName
 	}
@@ -19,7 +18,7 @@ func Reader(c appengine.Context, name string) (*bytes.Buffer, error) {
 		panic(err)
 		return nil, err
 	}
-	shards := (master.Size-1)/divisor + 1
+	shards := numShards(master.Size)
 
 	var wg sync.WaitGroup
 	wg.Add(shards)
@@ -41,6 +40,5 @@ func Reader(c appengine.Context, name string) (*bytes.Buffer, error) {
 		}(i)
 	}
 	wg.Wait()
-
-	return bytes.NewBuffer(data), nil
+	return data, nil
 }
