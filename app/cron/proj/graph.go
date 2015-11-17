@@ -45,7 +45,7 @@ func Graph(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	var post, ntag, nimg *graph.Node
 
 	idx := 0
-
+	timeout := time.After(time.Second)
 	g := graph.New(false)
 	for idk := range getItems(c) {
 		item = idk.(Item)
@@ -61,19 +61,30 @@ func Graph(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 			g.Connect(post, nimg, 0)
 		}
 
-		// This is a SLOW/DEBUG only operation
-		if idx%2000 == 0 {
-			c.Infof("Current Duration (%v)", time.Since(start))
+		// This is a DEBUG only operation
+		select {
+		case <-timeout:
+			c.Infof("Index: %d; Duration: %v", idx, time.Since(start))
+			timeout = time.After(time.Second)
+		default:
 		}
 		idx++
 	}
+	c.Infof("End Loop: %d; Duration: %v", idx, time.Since(start))
 
 	// Write result
 	bits, err := g.Bytes()
 	if err != nil {
 		c.Errorf("Error in Graph.Bytes: %v", err)
 	}
-	w.Write(bits)
+	c.Infof("End Serialization: Len(%d); Duration: %v", len(bits), time.Since(start))
+
+	// Storage
+	if err := sharder.Writer(c, "graph", bits); err != nil {
+		c.Errorf("Writer Error: %s", err)
+		return
+	}
+	c.Infof("Write Complete; Duration: %v", time.Since(start))
 
 	// Count types of nodes
 	binCtr := make(map[graph.NodeType]uint64)
