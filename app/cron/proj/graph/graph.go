@@ -13,6 +13,7 @@ type Graph struct {
 	s     *SerialGraph
 	nodes map[uint64]*Node              // Optimal lookup with pointers goes here
 	dupes map[NodeType]map[string]*Node // type > value > node
+	edges map[uint64]map[uint64]bool    // Edge duplicate detection
 }
 
 // New creates a new Graph
@@ -25,6 +26,7 @@ func New(isDirected bool) *Graph {
 		},
 		nodes: make(map[uint64]*Node),
 		dupes: make(map[NodeType]map[string]*Node),
+		edges: make(map[uint64]map[uint64]bool),
 	}
 }
 
@@ -60,17 +62,24 @@ func (g *Graph) Add(value string, ttype NodeType, weight int64) *Node {
 }
 
 // Connect connects nodes to and from with an edge of weight w
-func (g *Graph) Connect(to, from *Node, weight int64) error {
-	// TODO: collision checks
+func (g *Graph) Connect(from, to *Node, weight int64) error {
 	if to == nil || from == nil {
 		return errors.New("Cannot add edge to nil node")
 	}
-	from.Adjacent = append(from.Adjacent, *to.Id) // Directed edge
-	from.Weights = append(from.Weights, weight)
 
-	if !g.s.GetDirected() { // UnDirected edge (return trip)
-		to.Adjacent = append(to.Adjacent, *from.Id)
-		to.Weights = append(to.Weights, weight)
+	mm := g.edges[*from.Id]
+	if mm == nil {
+		mm = make(map[uint64]bool)
+		g.edges[*from.Id] = mm
+	}
+	if !mm[*to.Id] {
+		from.Adjacent = append(from.Adjacent, *to.Id) // Directed edge
+		from.Weights = append(from.Weights, weight)
+		mm[*to.Id] = true
+	}
+
+	if !g.s.GetDirected() && !g.edges[*to.Id][*from.Id] { // UnDirected edge (return trip)
+		g.Connect(to, from, weight)
 	}
 	return nil
 }
@@ -104,6 +113,18 @@ func DecodeGraph(data []byte) (*Graph, error) {
 	// Hydrate Graph from SerialGraph
 	for _, node := range sg.Nodes {
 		g.nodes[*node.Id] = node
+
+		// initialize node adjacency map
+		mm := g.edges[*node.Id]
+		if mm == nil {
+			mm = make(map[uint64]bool)
+			g.edges[*node.Id] = mm
+		}
+
+		// populate node adjacency map
+		for _, adjID := range node.GetAdjacent() {
+			mm[adjID] = true
+		}
 	}
 	return g, nil
 }
