@@ -13,11 +13,18 @@ func Writer(c appengine.Context, name string, data []byte) error {
 		return ErrInvalidName
 	}
 
-	master := shardMaster{len(data)}
-	shards := numShards(master.Size)
+	// Attempt to get existing key
+	key := masterKey(c, name)
+	oldMaster := shardMaster{}
+	oldShards := 0
+	if datastore.Get(c, key, &oldMaster) == nil {
+		oldShards = numShards(oldMaster.Size)
+	}
 
 	// Store shardMaster
-	if _, err := datastore.Put(c, masterKey(c, name), &master); err != nil {
+	master := shardMaster{len(data)}
+	shards := numShards(master.Size)
+	if _, err := datastore.Put(c, key, &master); err != nil {
 		return err
 	}
 
@@ -38,6 +45,15 @@ func Writer(c appengine.Context, name string, data []byte) error {
 			}
 			wg.Done()
 		}(i)
+	}
+
+	// Delete shards that shouldn't be in datastore (write something smaller than before)
+	if oldShards > shards {
+		keys := make([]*datastore.Key, oldShards-shards)
+		for i := shards; i < oldShards; i++ {
+			keys[i-shards] = shardKey(c, name, i)
+		}
+		datastore.DeleteMulti(c, keys)
 	}
 
 	wg.Wait()

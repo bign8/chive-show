@@ -39,5 +39,5 @@ type shardMaster struct {
 }
 
 type shard struct {
-	Data []byte
+	Data []byte `datastore:"data"`
 }
