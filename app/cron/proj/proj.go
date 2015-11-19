@@ -1,6 +1,7 @@
 package proj
 
 import (
+	"bytes"
 	"encoding/xml"
 
 	"appengine"
@@ -62,8 +63,15 @@ func flatten(c appengine.Context) chain.Worker {
 		var xmlPage XMLPage
 		var imgs []string
 
+		// Clean FormFeed characters from data
+		data := bytes.Replace(obj.([]byte), []byte("\u000C"), nil, -1)
+
+		// Start up decoder
+		decoder := xml.NewDecoder(bytes.NewReader(data))
+		decoder.Entity = xml.HTMLEntity
+
 		// Parse the XML of an object
-		if err := xml.Unmarshal(obj.([]byte), &xmlPage); err != nil {
+		if err := decoder.Decode(&xmlPage); err != nil {
 			c.Errorf("Flatten %d: %v", idx, err)
 			return
 		}
