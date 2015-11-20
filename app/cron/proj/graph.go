@@ -52,13 +52,13 @@ func Graph(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 		post = g.Add(item.GUID, graph.NodeType_POST, 0)
 
 		for _, tag := range validTags(item.Tags) {
-			ntag = g.Add(tag, graph.NodeType_TAG, 0)
-			g.Connect(post, ntag, 0)
+			ntag = g.Add(tag, graph.NodeType_TAG, 1)
+			g.Connect(post, ntag, 1)
 		}
 
 		for _, img := range item.Imgs {
-			nimg = g.Add(img, graph.NodeType_IMG, 0)
-			g.Connect(post, nimg, 0)
+			nimg = g.Add(img, graph.NodeType_IMG, 1)
+			g.Connect(post, nimg, 1)
 		}
 
 		// This is a DEBUG only operation

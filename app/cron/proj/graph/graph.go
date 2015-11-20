@@ -66,22 +66,34 @@ func (g *Graph) Connect(from, to *Node, weight int64) error {
 	if to == nil || from == nil {
 		return errors.New("Cannot add edge to nil node")
 	}
+	g.connect(from, to, weight) // Directed edge
+	if !g.s.GetDirected() {
+		g.connect(to, from, weight) // UnDirected edge (return trip)
+	}
+	return nil
+}
 
+func (g *Graph) connect(from, to *Node, weight int64) {
 	mm := g.edges[*from.Id]
 	if mm == nil {
 		mm = make(map[uint64]bool)
 		g.edges[*from.Id] = mm
 	}
 	if !mm[*to.Id] {
-		from.Adjacent = append(from.Adjacent, *to.Id) // Directed edge
+		from.Adjacent = append(from.Adjacent, *to.Id)
 		from.Weights = append(from.Weights, weight)
 		mm[*to.Id] = true
+	} else {
+		// This si SUPER SLOW for highly connected nodes. TODO: make this not suck
+		idx := 0
+		for i, nodeID := range from.Adjacent {
+			if nodeID == *to.Id {
+				idx = i
+				break
+			}
+		}
+		from.Weights[idx] += weight
 	}
-
-	if !g.s.GetDirected() && !g.edges[*to.Id][*from.Id] { // UnDirected edge (return trip)
-		g.Connect(to, from, weight)
-	}
-	return nil
 }
 
 func (g *Graph) genNodeID() (id uint64) {
@@ -113,6 +125,14 @@ func DecodeGraph(data []byte) (*Graph, error) {
 	// Hydrate Graph from SerialGraph
 	for _, node := range sg.Nodes {
 		g.nodes[*node.Id] = node
+
+		// Initialize dupes map
+		nn := g.dupes[node.GetType()]
+		if nn == nil {
+			nn = make(map[string]*Node)
+			g.dupes[node.GetType()] = nn
+		}
+		nn[node.GetValue()] = node
 
 		// initialize node adjacency map
 		mm := g.edges[*node.Id]
