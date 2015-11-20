@@ -3,7 +3,7 @@
 // DO NOT EDIT!
 
 /*
-Package main is a generated protocol buffer package.
+Package graph is a generated protocol buffer package.
 
 It is generated from these files:
 	graph.proto
@@ -48,116 +48,71 @@ var NodeType_value = map[string]int32{
 	"USER":    4,
 }
 
-func (x NodeType) Enum() *NodeType {
-	p := new(NodeType)
-	*p = x
-	return p
-}
 func (x NodeType) String() string {
 	return proto.EnumName(NodeType_name, int32(x))
 }
-func (x *NodeType) UnmarshalJSON(data []byte) error {
-	value, err := proto.UnmarshalJSONEnum(NodeType_value, data, "NodeType")
-	if err != nil {
-		return err
-	}
-	*x = NodeType(value)
-	return nil
-}
+func (NodeType) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
 type SerialGraph struct {
-	Nodes            []*Node `protobuf:"bytes,1,rep,name=nodes" json:"nodes,omitempty"`
-	Directed         *bool   `protobuf:"varint,2,opt,name=directed,def=0" json:"directed,omitempty"`
-	NodeCount        *uint64 `protobuf:"varint,3,req,name=nodeCount,def=0" json:"nodeCount,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
+	Nodes     map[uint64]*Node `protobuf:"bytes,1,rep,name=nodes" json:"nodes,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Directed  bool             `protobuf:"varint,2,opt,name=directed" json:"directed,omitempty"`
+	NodeCount uint64           `protobuf:"varint,3,opt,name=nodeCount" json:"nodeCount,omitempty"`
 }
 
-func (m *SerialGraph) Reset()         { *m = SerialGraph{} }
-func (m *SerialGraph) String() string { return proto.CompactTextString(m) }
-func (*SerialGraph) ProtoMessage()    {}
+func (m *SerialGraph) Reset()                    { *m = SerialGraph{} }
+func (m *SerialGraph) String() string            { return proto.CompactTextString(m) }
+func (*SerialGraph) ProtoMessage()               {}
+func (*SerialGraph) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
-const Default_SerialGraph_Directed bool = false
-const Default_SerialGraph_NodeCount uint64 = 0
-
-func (m *SerialGraph) GetNodes() []*Node {
+func (m *SerialGraph) GetNodes() map[uint64]*Node {
 	if m != nil {
 		return m.Nodes
 	}
 	return nil
 }
 
-func (m *SerialGraph) GetDirected() bool {
-	if m != nil && m.Directed != nil {
-		return *m.Directed
-	}
-	return Default_SerialGraph_Directed
-}
-
-func (m *SerialGraph) GetNodeCount() uint64 {
-	if m != nil && m.NodeCount != nil {
-		return *m.NodeCount
-	}
-	return Default_SerialGraph_NodeCount
-}
-
 type Node struct {
-	Id               *uint64   `protobuf:"varint,1,req,name=id" json:"id,omitempty"`
-	Value            *string   `protobuf:"bytes,2,req,name=value" json:"value,omitempty"`
-	Weight           *int64    `protobuf:"varint,3,opt,name=weight" json:"weight,omitempty"`
-	Type             *NodeType `protobuf:"varint,4,opt,name=type,enum=main.NodeType,def=0" json:"type,omitempty"`
-	Adjacent         []uint64  `protobuf:"varint,5,rep,name=adjacent" json:"adjacent,omitempty"`
-	Weights          []int64   `protobuf:"varint,6,rep,name=weights" json:"weights,omitempty"`
-	XXX_unrecognized []byte    `json:"-"`
+	Value    string           `protobuf:"bytes,1,opt,name=value" json:"value,omitempty"`
+	Weight   int64            `protobuf:"varint,2,opt,name=weight" json:"weight,omitempty"`
+	Type     NodeType         `protobuf:"varint,3,opt,name=type,enum=graph.NodeType" json:"type,omitempty"`
+	Adjacent map[uint64]int64 `protobuf:"bytes,4,rep,name=adjacent" json:"adjacent,omitempty" protobuf_key:"varint,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
 }
 
-func (m *Node) Reset()         { *m = Node{} }
-func (m *Node) String() string { return proto.CompactTextString(m) }
-func (*Node) ProtoMessage()    {}
+func (m *Node) Reset()                    { *m = Node{} }
+func (m *Node) String() string            { return proto.CompactTextString(m) }
+func (*Node) ProtoMessage()               {}
+func (*Node) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
 
-const Default_Node_Type NodeType = NodeType_UNKNOWN
-
-func (m *Node) GetId() uint64 {
-	if m != nil && m.Id != nil {
-		return *m.Id
-	}
-	return 0
-}
-
-func (m *Node) GetValue() string {
-	if m != nil && m.Value != nil {
-		return *m.Value
-	}
-	return ""
-}
-
-func (m *Node) GetWeight() int64 {
-	if m != nil && m.Weight != nil {
-		return *m.Weight
-	}
-	return 0
-}
-
-func (m *Node) GetType() NodeType {
-	if m != nil && m.Type != nil {
-		return *m.Type
-	}
-	return Default_Node_Type
-}
-
-func (m *Node) GetAdjacent() []uint64 {
+func (m *Node) GetAdjacent() map[uint64]int64 {
 	if m != nil {
 		return m.Adjacent
 	}
 	return nil
 }
 
-func (m *Node) GetWeights() []int64 {
-	if m != nil {
-		return m.Weights
-	}
-	return nil
+func init() {
+	proto.RegisterEnum("graph.NodeType", NodeType_name, NodeType_value)
 }
 
-func init() {
-	proto.RegisterEnum("main.NodeType", NodeType_name, NodeType_value)
+var fileDescriptor0 = []byte{
+	// 294 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x54, 0x91, 0x41, 0x4b, 0xc3, 0x40,
+	0x10, 0x85, 0xdd, 0xee, 0xb6, 0x4d, 0x67, 0x69, 0x5d, 0xe7, 0x14, 0x03, 0x85, 0xd2, 0x53, 0x51,
+	0x89, 0x10, 0x2f, 0x2a, 0x78, 0x28, 0x52, 0x82, 0x88, 0xa9, 0x98, 0x14, 0xcf, 0xb1, 0x59, 0xda,
+	0x68, 0x49, 0x42, 0xdc, 0x2a, 0xf9, 0x2d, 0xde, 0xfc, 0xa5, 0x66, 0xd7, 0x2a, 0xe9, 0x2d, 0x33,
+	0xef, 0x7d, 0xf3, 0x5e, 0x58, 0xe0, 0xab, 0x32, 0x2e, 0xd6, 0x6e, 0x51, 0xe6, 0x2a, 0xc7, 0xb6,
+	0x19, 0xc6, 0x5f, 0x04, 0x78, 0x28, 0xcb, 0x34, 0xde, 0xf8, 0x7a, 0xc6, 0x33, 0x68, 0x67, 0x79,
+	0x22, 0xdf, 0x6d, 0x32, 0xa2, 0x13, 0xee, 0x0d, 0xdd, 0x5f, 0xa6, 0x61, 0x71, 0x03, 0xad, 0xcf,
+	0x32, 0x55, 0x56, 0x28, 0xc0, 0x4a, 0xd2, 0x52, 0x2e, 0x95, 0x4c, 0xec, 0xd6, 0x88, 0x4c, 0x2c,
+	0x3c, 0x82, 0x9e, 0xe6, 0x6f, 0xf3, 0x6d, 0xa6, 0x6c, 0x5a, 0xaf, 0x98, 0x73, 0x05, 0xd0, 0x40,
+	0x38, 0xd0, 0x37, 0x59, 0xd5, 0xe7, 0x6b, 0x09, 0x1d, 0x68, 0x7f, 0xc4, 0x9b, 0xad, 0x34, 0x30,
+	0xf7, 0xf8, 0x2e, 0x4d, 0xdb, 0xaf, 0x5b, 0x97, 0x64, 0xfc, 0x4d, 0x80, 0xe9, 0x01, 0xfb, 0x7f,
+	0x46, 0xcd, 0xf5, 0x70, 0x00, 0x9d, 0x4f, 0x99, 0xae, 0xd6, 0xca, 0x80, 0x14, 0x87, 0xc0, 0x54,
+	0x55, 0x48, 0x13, 0x38, 0xf0, 0x0e, 0x1b, 0x67, 0xa2, 0x7a, 0x8d, 0xa7, 0x60, 0xc5, 0xc9, 0x6b,
+	0xbc, 0x94, 0x75, 0x27, 0x66, 0xfe, 0xeb, 0xb8, 0x61, 0x71, 0xa7, 0x3b, 0xcd, 0x14, 0x74, 0xce,
+	0xa1, 0xbf, 0xb7, 0xd8, 0x6f, 0xdc, 0x6f, 0x36, 0xa6, 0xba, 0xe4, 0xc9, 0x0d, 0x58, 0xff, 0x49,
+	0x1c, 0xba, 0x8b, 0xe0, 0x3e, 0x98, 0x3f, 0x07, 0xe2, 0x00, 0x2d, 0x60, 0x8f, 0xf3, 0x30, 0x12,
+	0x04, 0xbb, 0x40, 0xef, 0x1e, 0x7c, 0xd1, 0xd2, 0x1f, 0xd1, 0xd4, 0x17, 0x54, 0x6b, 0x8b, 0x70,
+	0xf6, 0x24, 0xd8, 0x4b, 0xc7, 0xbc, 0xc7, 0xc5, 0x4f, 0x00, 0x00, 0x00, 0xff, 0xff, 0xbf, 0x47,
+	0x15, 0xe3, 0x9e, 0x01, 0x00, 0x00,
 }

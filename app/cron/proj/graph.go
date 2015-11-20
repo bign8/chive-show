@@ -42,7 +42,7 @@ func Graph(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	var item Item
-	var post, ntag, nimg *graph.Node
+	var post, ntag, nimg graph.NodeID
 
 	idx := 0
 	timeout := time.After(time.Second)
@@ -89,7 +89,7 @@ func Graph(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	// Count types of nodes
 	binCtr := make(map[graph.NodeType]uint64)
 	for _, node := range g.Nodes() {
-		binCtr[*node.Type]++
+		binCtr[node.Type]++
 	}
 
 	// Log out types of nodes

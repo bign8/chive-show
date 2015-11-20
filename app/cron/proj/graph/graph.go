@@ -1,112 +1,89 @@
 package graph
 
-import (
-	"errors"
-
-	"github.com/golang/protobuf/proto"
-)
+import "errors"
 
 // TODO: add some graph processing functions
+
+// NodeID is a graph identifier
+type NodeID uint64
 
 // Graph is the serializable graph we have all been looking for
 type Graph struct {
 	s     *SerialGraph
-	nodes map[uint64]*Node              // Optimal lookup with pointers goes here
-	dupes map[NodeType]map[string]*Node // type > value > node
-	edges map[uint64]map[uint64]bool    // Edge duplicate detection
+	dupes map[NodeType]map[string]NodeID // type > value > node
 }
 
 // New creates a new Graph
 func New(isDirected bool) *Graph {
 	return &Graph{
 		s: &SerialGraph{
-			Nodes:     make([]*Node, 0),
-			Directed:  proto.Bool(isDirected),
-			NodeCount: proto.Uint64(0),
+			Nodes:     make(map[uint64]*Node),
+			Directed:  isDirected,
+			NodeCount: 0,
 		},
-		nodes: make(map[uint64]*Node),
-		dupes: make(map[NodeType]map[string]*Node),
-		edges: make(map[uint64]map[uint64]bool),
+		dupes: make(map[NodeType]map[string]NodeID),
 	}
 }
 
+// Get returns an associated node for a given ID
+func (g *Graph) Get(id NodeID) *Node {
+	return g.s.Nodes[uint64(id)]
+}
+
 // Add creates and adds a node to the graph
-func (g *Graph) Add(value string, ttype NodeType, weight int64) *Node {
+func (g *Graph) Add(value string, ttype NodeType, weight int64) NodeID {
 
 	// Check duplicate node (add weight)
 	dupe := g.dupes[ttype][value]
-	if dupe != nil {
-		*dupe.Weight += weight
+	if dupe != 0 {
+		g.Get(dupe).Weight += weight
 		return dupe
 	}
 
 	// Create new node
+	id := g.genNodeID()
 	n := &Node{
-		Id:       proto.Uint64(g.genNodeID()),
-		Value:    proto.String(value),
-		Weight:   proto.Int64(weight),
-		Type:     ttype.Enum(),
-		Adjacent: make([]uint64, 0),
+		Value:    value,
+		Weight:   weight,
+		Type:     ttype,
+		Adjacent: make(map[uint64]int64, 0),
 	}
-	g.nodes[*n.Id] = n
-	g.s.Nodes = append(g.s.Nodes, n)
+	g.s.Nodes[id] = n
 
 	// Add dupe check to list
 	dub, ok := g.dupes[ttype]
 	if !ok {
-		dub = make(map[string]*Node)
+		dub = make(map[string]NodeID)
 		g.dupes[ttype] = dub
 	}
-	dub[value] = n
-	return n
+	nid := NodeID(id)
+	dub[value] = nid
+	return nid
 }
 
 // Connect connects nodes to and from with an edge of weight w
-func (g *Graph) Connect(from, to *Node, weight int64) error {
-	if to == nil || from == nil {
+func (g *Graph) Connect(from, to NodeID, weight int64) error {
+	if to == 0 || from == 0 {
 		return errors.New("Cannot add edge to nil node")
 	}
-	g.connect(from, to, weight) // Directed edge
-	if !g.s.GetDirected() {
-		g.connect(to, from, weight) // UnDirected edge (return trip)
+	g.Get(from).Adjacent[uint64(to)] += weight // Directed edge
+	if !g.s.Directed {
+		g.Get(to).Adjacent[uint64(from)] += weight // UnDirected edge (return trip)
 	}
 	return nil
 }
 
-func (g *Graph) connect(from, to *Node, weight int64) {
-	mm := g.edges[*from.Id]
-	if mm == nil {
-		mm = make(map[uint64]bool)
-		g.edges[*from.Id] = mm
-	}
-	if !mm[*to.Id] {
-		from.Adjacent = append(from.Adjacent, *to.Id)
-		from.Weights = append(from.Weights, weight)
-		mm[*to.Id] = true
-	} else {
-		// This si SUPER SLOW for highly connected nodes. TODO: make this not suck
-		idx := 0
-		for i, nodeID := range from.Adjacent {
-			if nodeID == *to.Id {
-				idx = i
-				break
-			}
-		}
-		from.Weights[idx] += weight
-	}
-}
-
 func (g *Graph) genNodeID() (id uint64) {
-	id = g.s.GetNodeCount()
-	*g.s.NodeCount++
+	g.s.NodeCount++
+	id = g.s.NodeCount
 	return id
 }
 
 // Nodes returns all the nodes in the Graph
 func (g *Graph) Nodes() []*Node {
-	n := make([]*Node, len(g.nodes))
+	n := make([]*Node, len(g.s.Nodes))
 	ctr := 0
-	for _, node := range g.nodes {
+	for _, node := range g.s.Nodes {
 		n[ctr] = node
 		ctr++
 	}
@@ -123,35 +100,19 @@ func DecodeGraph(data []byte) (*Graph, error) {
 	g.s = sg
 
 	// Hydrate Graph from SerialGraph
-	for _, node := range sg.Nodes {
-		g.nodes[*node.Id] = node
-
-		// Initialize dupes map
-		nn := g.dupes[node.GetType()]
+	for id, node := range sg.Nodes {
+		nn := g.dupes[node.Type]
 		if nn == nil {
-			nn = make(map[string]*Node)
-			g.dupes[node.GetType()] = nn
+			nn = make(map[string]NodeID)
+			g.dupes[node.Type] = nn
 		}
-		nn[node.GetValue()] = node
-
-		// initialize node adjacency map
-		mm := g.edges[*node.Id]
-		if mm == nil {
-			mm = make(map[uint64]bool)
-			g.edges[*node.Id] = mm
-		}
-
-		// populate node adjacency map
-		for _, adjID := range node.GetAdjacent() {
-			mm[adjID] = true
-		}
+		nn[node.Value] = NodeID(id)
 	}
 	return g, nil
 }
 
 // Bytes flattens a graph to a flat file format
 func (g *Graph) Bytes() ([]byte, error) {
-	// TODO: use smaller numbers for encoding...
 	return g.s.Bytes()
 }
 

@@ -1,9 +1,10 @@
+syntax = "proto3";
 package graph;
 
 message SerialGraph {
-	repeated Node nodes = 1;
-	optional bool directed = 2 [default = false];
-	required uint64 nodeCount = 3 [default = 0];
+	map<uint64, Node> nodes = 1;
+	bool directed = 2;
+	uint64 nodeCount = 3;
 }
 
 enum NodeType {
@@ -15,10 +16,8 @@ enum NodeType {
 }
 
 message Node {
-	required uint64 id = 1;
-	required string value = 2;
-	optional int64 weight = 3;
-	optional NodeType type = 4 [default = UNKNOWN];
-	repeated uint64 adjacent = 5;
-	repeated int64 weights = 6;
+	string value = 1;
+	int64 weight = 2;
+	NodeType type = 3;
+	map<uint64, int64> adjacent = 4;
 }
