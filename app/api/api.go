@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -8,10 +9,9 @@ import (
 
 	"github.com/bign8/chive-show/app/helpers/keycache"
 	"github.com/bign8/chive-show/app/models"
-	"gopkg.in/mjibson/v1/appstats"
-
-	"appengine"
-	"appengine/datastore"
+	"github.com/mjibson/appstats"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/log"
 )
 
 // Init fired to initialize api
@@ -29,19 +29,19 @@ func getURLCount(url *url.URL) int {
 }
 
 // Actual API functions
-func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+func random(c context.Context, w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	count := getURLCount(r.URL)
-	c.Infof("Requested %v random posts", count)
+	log.Infof(c, "Requested %v random posts", count)
 	result := NewJSONResponse(http.StatusInternalServerError, "Unknown Error", nil)
 
 	// Pull keys from post keys object
 	keys, err := keycache.GetKeys(c, models.POST)
 	if err != nil {
-		c.Errorf("heleprs.GetKeys %v", err)
+		log.Errorf(c, "heleprs.GetKeys %v", err)
 		result.Msg = "Error with keycache GetKeys"
 	} else if len(keys) < count {
-		c.Errorf("Not enough keys(%v) for count(%v)", len(keys), count)
+		log.Errorf(c, "Not enough keys(%v) for count(%v)", len(keys), count)
 		result.Msg = "Basically empty datastore"
 	} else {
 
@@ -54,7 +54,7 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 		// Pull posts from datastore
 		data := make([]models.Post, count) // TODO: cache items in memcache too (make a helper)
 		if err := datastore.GetMulti(c, keys[:count], data); err != nil {
-			c.Errorf("datastore.GetMulti %v", err)
+			log.Errorf(c, "datastore.GetMulti %v", err)
 			result.Msg = "Error with datastore GetMulti"
 		} else {
 			result = NewJSONResponse(http.StatusOK, "Your amazing data awaits", data)
@@ -62,6 +62,6 @@ func random(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = result.write(w); err != nil {
-		c.Errorf("result.write %v", err)
+		log.Errorf(c, "result.write %v", err)
 	}
 }

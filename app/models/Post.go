@@ -3,7 +3,7 @@ package models
 import (
 	"encoding/json"
 
-	"appengine/datastore"
+	"google.golang.org/appengine/datastore"
 )
 
 // Post data object
@@ -27,7 +27,7 @@ type Post struct {
 }
 
 // Load Datastore LoadSaveProperty Interface
-func (x *Post) Load(c <-chan datastore.Property) error {
+func (x *Post) Load(c []datastore.Property) error {
 	if err := datastore.LoadStruct(x, c); err != nil {
 		return err
 	}
@@ -35,10 +35,9 @@ func (x *Post) Load(c <-chan datastore.Property) error {
 }
 
 // Save Datastore LoadSaveProperty Interface
-func (x *Post) Save(c chan<- datastore.Property) (err error) {
+func (x *Post) Save() (props []datastore.Property, err error) {
 	if x.MediaBytes, err = json.Marshal(&x.Media); err != nil {
-		close(c)
-		return err
+		return nil, err
 	}
-	return datastore.SaveStruct(x, c)
+	return datastore.SaveStruct(x)
 }

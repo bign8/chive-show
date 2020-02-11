@@ -1,21 +1,22 @@
 package keycache
 
 import (
+	"context"
 	"time"
 
-	"appengine"
-	"appengine/datastore"
-	"appengine/memcache"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/memcache"
 )
 
 // GetKeys returns the keys for a particular item
-func GetKeys(c appengine.Context, name string) ([]*datastore.Key, error) {
+func GetKeys(c context.Context, name string) ([]*datastore.Key, error) {
 	var container entityKeys
 
 	// Check Memcache
 	start := time.Now()
 	_, err := memcache.Gob.Get(c, memcacheKey(name), &container)
-	c.Infof("Actual Memcache.Get: %s", time.Since(start))
+	log.Infof(c, "Actual Memcache.Get: %s", time.Since(start))
 
 	if err != nil {
 		if err != memcache.ErrCacheMiss {
@@ -25,11 +26,11 @@ func GetKeys(c appengine.Context, name string) ([]*datastore.Key, error) {
 		key := datastoreKey(c, name)
 		start := time.Now()
 		err = datastore.Get(c, key, &container)
-		c.Infof("Actual Datastore.Get: %s", time.Since(start))
+		log.Infof(c, "Actual Datastore.Get: %s", time.Since(start))
 
 		// Datastore MISS
 		if err == datastore.ErrNoSuchEntity { // FYI: this is a costly operation
-			c.Infof("Datastore MISS: Costly Query getting keys over \"%v\"", name)
+			log.Infof(c, "Datastore MISS: Costly Query getting keys over \"%v\"", name)
 			err = nil
 			keys, err := datastore.NewQuery(name).KeysOnly().GetAll(c, nil)
 			if err != nil {

@@ -9,8 +9,9 @@ import (
 	"github.com/bign8/chive-show/app/helpers/keycache"
 	"github.com/bign8/chive-show/app/models"
 
-	"appengine"
-	"appengine/datastore"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/log"
 )
 
 func delete(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +34,7 @@ func delete(w http.ResponseWriter, r *http.Request) {
 		delKeys = append(delKeys, key)
 		if len(delKeys) > 50 {
 			err = datastore.DeleteMulti(c, delKeys)
-			c.Infof("Deleting Keys %v", delKeys)
+			log.Infof(c, "Deleting Keys %v", delKeys)
 			delKeys = nil
 		}
 		if err != nil {
