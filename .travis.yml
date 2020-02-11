@@ -2,12 +2,14 @@ language: go
 sudo: false
 
 go:
-  - 1.4
+  - 1.12
+
+env:
+  - GO111MODULE=on
 
 # Notes: http://orcaman.blogspot.com/2014/09/ci-when-githubtravis-meet-gogae.html
 before_install: ./script/ci/before_install.sh
 install: ./script/ci/install.sh
-before_script: ./script/ci/before_script.sh
 script: ./script/ci/script.sh
 after_success: ./script/ci/after_success.sh
 

@@ -3,7 +3,7 @@ serve:
 .PHONY:=serve
 
 format:
-	goimports -w .
+	goimports -w -l .
 .PHONY:=format
 
 deploy:
