@@ -1,8 +1,9 @@
 package keycache
 
 import (
-	"appengine"
-	"appengine/datastore"
+	"context"
+
+	"google.golang.org/appengine/datastore"
 )
 
 const (
@@ -14,7 +15,7 @@ func memcacheKey(name string) string {
 	return NAME + ":" + name
 }
 
-func datastoreKey(c appengine.Context, name string) *datastore.Key {
+func datastoreKey(c context.Context, name string) *datastore.Key {
 	return datastore.NewKey(c, NAME, name, 0, nil)
 }
 
@@ -47,7 +48,7 @@ func (x *entityKeys) addKeys(keys []*datastore.Key) {
 	}
 }
 
-func (x *entityKeys) toKeys(c appengine.Context, name string) []*datastore.Key {
+func (x *entityKeys) toKeys(c context.Context, name string) []*datastore.Key {
 	keys := make([]*datastore.Key, len(x.Keys))
 	for i, item := range x.Keys {
 		keys[i] = item.toKey(c, name)
@@ -63,6 +64,6 @@ type entityKey struct {
 	IntID    int64
 }
 
-func (x *entityKey) toKey(c appengine.Context, name string) *datastore.Key {
+func (x *entityKey) toKey(c context.Context, name string) *datastore.Key {
 	return datastore.NewKey(c, name, x.StringID, x.IntID, nil)
 }

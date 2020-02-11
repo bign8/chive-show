@@ -1,13 +1,14 @@
 package keycache
 
 import (
-	"appengine"
-	"appengine/datastore"
-	"appengine/memcache"
+	"context"
+
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/memcache"
 )
 
 // AddKeys add keys to the context
-func AddKeys(c appengine.Context, name string, keys []*datastore.Key) error {
+func AddKeys(c context.Context, name string, keys []*datastore.Key) error {
 	var container entityKeys
 	ds := datastoreKey(c, name)
 	mc := memcacheKey(name)

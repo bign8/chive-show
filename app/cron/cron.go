@@ -1,6 +1,7 @@
 package cron
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -10,13 +11,13 @@ import (
 
 	"github.com/bign8/chive-show/app/helpers/keycache"
 	"github.com/bign8/chive-show/app/models"
-	"gopkg.in/mjibson/v1/appstats"
-
-	"appengine"
-	"appengine/datastore"
-	"appengine/delay"
-	"appengine/taskqueue"
-	"appengine/urlfetch"
+	"github.com/mjibson/appstats"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/delay"
+	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/taskqueue"
+	"google.golang.org/appengine/urlfetch"
 )
 
 const (
@@ -48,7 +49,7 @@ func pageURL(idx int) string {
 	return fmt.Sprintf("http://thechive.com/feed/?paged=%d", idx)
 }
 
-func parseFeeds(c appengine.Context, w http.ResponseWriter, r *http.Request) {
+func parseFeeds(c context.Context, w http.ResponseWriter, r *http.Request) {
 	fp := new(feedParser)
 	err := fp.Main(c, w)
 	if err != nil {
@@ -59,7 +60,7 @@ func parseFeeds(c appengine.Context, w http.ResponseWriter, r *http.Request) {
 }
 
 type feedParser struct {
-	context appengine.Context
+	context context.Context
 	client  *http.Client
 
 	todo  []int
@@ -67,7 +68,7 @@ type feedParser struct {
 	posts []models.Post
 }
 
-func (x *feedParser) Main(c appengine.Context, w http.ResponseWriter) error {
+func (x *feedParser) Main(c context.Context, w http.ResponseWriter) error {
 	x.context = c
 	x.client = urlfetch.Client(c)
 
@@ -75,7 +76,7 @@ func (x *feedParser) Main(c appengine.Context, w http.ResponseWriter) error {
 	// TODO: do this with sharded keys
 	keys, err := datastore.NewQuery(models.POST).KeysOnly().GetAll(c, nil)
 	if err != nil {
-		c.Errorf("Error finding keys %v %v", err, appengine.IsOverQuota(err))
+		log.Errorf(c, "Error finding keys %v %v", err, appengine.IsOverQuota(err))
 		return err
 	}
 	x.guids = map[int64]bool{}
@@ -93,7 +94,7 @@ func (x *feedParser) Main(c appengine.Context, w http.ResponseWriter) error {
 	// Initial recursive edge case
 	isStop, fullStop, err := x.isStop(1)
 	if isStop || fullStop || err != nil {
-		c.Infof("Finished without recursive searching %v", err)
+		log.Infof(c, "Finished without recursive searching %v", err)
 		if err == nil {
 			err = x.storePosts(x.posts)
 		}
@@ -121,12 +122,12 @@ func (x *feedParser) Main(c appengine.Context, w http.ResponseWriter) error {
 	}
 
 	if err != nil {
-		c.Errorf("Error in Main %v", err)
+		log.Errorf(c, "Error in Main %v", err)
 	}
 	return err
 }
 
-var processBatchDeferred = delay.Func("process-todo-batch", func(c appengine.Context, ids []int) {
+var processBatchDeferred = delay.Func("process-todo-batch", func(c context.Context, ids []int) {
 	parser := feedParser{
 		context: c,
 		client:  urlfetch.Client(c),
@@ -148,7 +149,7 @@ func (x *feedParser) processBatch(ids []int) error {
 	for i := 0; i < len(ids); i++ {
 		err := <-done
 		if err != nil {
-			x.context.Errorf("error storing feed (at index %d): %v", i, err)
+			log.Errorf(x.context, "error storing feed (at index %d): %v", i, err)
 			return err
 		}
 	}
@@ -156,7 +157,7 @@ func (x *feedParser) processBatch(ids []int) error {
 }
 
 func (x *feedParser) processTodo() error {
-	x.context.Infof("Processing TODO: %v", x.todo)
+	log.Infof(x.context, "Processing TODO: %v", x.todo)
 
 	var batch []int
 	var task *taskqueue.Task
@@ -193,7 +194,7 @@ func (x *feedParser) processTodo() error {
 		}
 	}
 	if DEFERRED && len(allTasks) > 0 {
-		x.context.Infof("Adding %d task(s) to the default queue", len(allTasks))
+		log.Infof(x.context, "Adding %d task(s) to the default queue", len(allTasks))
 		taskqueue.AddMulti(x.context, allTasks, "default")
 	}
 	return err
@@ -220,7 +221,7 @@ func (x *feedParser) Search(bottom, top int) (err error) {
 	    return infinite_length(bottom, top)  # Tail recursion!!!
 	*/
 	if bottom == top-1 {
-		x.context.Infof("TOP OF RANGE FOUND! @%d", top)
+		log.Infof(x.context, "TOP OF RANGE FOUND! @%d", top)
 		x.addRange(bottom, top)
 		return nil
 	}
@@ -258,11 +259,11 @@ func (x *feedParser) isStop(idx int) (isStop, fullStop bool, err error) {
 	// Gather posts as necessary
 	posts, err := x.getAndParseFeed(idx)
 	if err == ErrFeedParse404 {
-		x.context.Infof("Reached the end of the feed list (%v)", idx)
+		log.Infof(x.context, "Reached the end of the feed list (%v)", idx)
 		return true, false, nil
 	}
 	if err != nil {
-		x.context.Errorf("Error decoding ChiveFeed: %s", err)
+		log.Errorf(x.context, "Error decoding ChiveFeed: %s", err)
 		return false, false, err
 	}
 
@@ -291,7 +292,7 @@ func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 	url := pageURL(idx)
 
 	// Get Response
-	x.context.Infof("Parsing index %v (%v)", idx, url)
+	log.Infof(x.context, "Parsing index %v (%v)", idx, url)
 	resp, err := x.client.Get(url)
 	if err != nil {
 		return nil, err
@@ -352,17 +353,17 @@ func (x *feedParser) cleanPost(p *models.Post) (*datastore.Key, error) {
 	}
 	// Remove link posts
 	if link {
-		x.context.Infof("Ignoring links post %v \"%v\"", p.GUID, p.Title)
+		log.Infof(x.context, "Ignoring links post %v \"%v\"", p.GUID, p.Title)
 		return nil, fmt.Errorf("Ignoring links post")
 	}
 
 	// Detect video only posts
 	video := regexp.MustCompile("\\([^&]*Video.*\\)")
 	if video.MatchString(p.Title) {
-		x.context.Infof("Ignoring video post %v \"%v\"", p.GUID, p.Title)
+		log.Infof(x.context, "Ignoring video post %v \"%v\"", p.GUID, p.Title)
 		return nil, fmt.Errorf("Ignoring video post")
 	}
-	x.context.Infof("Storing post %v \"%v\"", p.GUID, p.Title)
+	log.Infof(x.context, "Storing post %v \"%v\"", p.GUID, p.Title)
 
 	// Cleanup post titles
 	clean := regexp.MustCompile("\\W\\(([^\\)]*)\\)$")

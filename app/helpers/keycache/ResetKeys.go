@@ -1,13 +1,14 @@
 package keycache
 
 import (
-	"appengine"
-	"appengine/datastore"
-	"appengine/memcache"
+	"context"
+
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/memcache"
 )
 
 // ResetKeys resets all item keys
-func ResetKeys(c appengine.Context, name string) error {
+func ResetKeys(c context.Context, name string) error {
 	errc := make(chan error, 2)
 	go func() {
 		err := memcache.Delete(c, memcacheKey(name))
