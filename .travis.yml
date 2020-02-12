@@ -1,17 +1,28 @@
 language: go
-sudo: false
-
+dist: xenial
 go:
-  - 1.12
-
+- 1.12
 env:
-  - GO111MODULE=on
-
-# Notes: http://orcaman.blogspot.com/2014/09/ci-when-githubtravis-meet-gogae.html
-before_install: ./script/ci/before_install.sh
-install: ./script/ci/install.sh
-script: ./script/ci/script.sh
-after_success: ./script/ci/after_success.sh
-
+- GO111MODULE=on
+install:
+- go mod download
+script:
+- go test -race -coverprofile=coverage.txt -covermode=atomic ./app/...
+after_success:
+- bash <(curl -s https://codecov.io/bash)
+deploy:
+- provider: gae
+  project: crucial-alpha-706
+  promote: false
+  on:
+    all_branches: true
+  edge: true
+- provider: gae
+  project: crucial-alpha-706
+  version: default
+  edge: true
 notifications:
   email: false
+before_install:
+- openssl aes-256-cbc -K $encrypted_16c043351149_key -iv $encrypted_16c043351149_iv
+  -in service-account.json.enc -out service-account.json -d
