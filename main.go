@@ -3,10 +3,10 @@ package main
 import (
 	"net/http"
 
-	"github.com/bign8/chive-show/app/api"
-	"github.com/bign8/chive-show/app/cron"
-
 	"google.golang.org/appengine"
+
+	"github.com/bign8/chive-show/api"
+	"github.com/bign8/chive-show/cron"
 )
 
 func main() {

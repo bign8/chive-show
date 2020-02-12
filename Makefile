@@ -3,7 +3,7 @@ serve:
 .PHONY:=serve
 
 format:
-	goimports -w -l .
+	goimports -w -l -local github.com/bign8/chive-show .
 .PHONY:=format
 
 deploy:

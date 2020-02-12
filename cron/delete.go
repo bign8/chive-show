@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/bign8/chive-show/app/helpers/keycache"
-	"github.com/bign8/chive-show/app/models"
-
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
+
+	"github.com/bign8/chive-show/keycache"
+	"github.com/bign8/chive-show/models"
 )
 
 func delete(w http.ResponseWriter, r *http.Request) {
