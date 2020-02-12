@@ -20,6 +20,6 @@ handlers:
   script: auto
 
 error_handlers:
-  - file: err/default.html
+  - file: static/error.html
   - error_code: over_quota
-    file: err/over_quota.html
+    file: static/over_quota.html
