@@ -7,11 +7,12 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/bign8/chive-show/app/helpers/keycache"
-	"github.com/bign8/chive-show/app/models"
 	"github.com/mjibson/appstats"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
+
+	"github.com/bign8/chive-show/keycache"
+	"github.com/bign8/chive-show/models"
 )
 
 // Init fired to initialize api

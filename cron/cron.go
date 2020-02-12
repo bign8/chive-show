@@ -9,8 +9,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/bign8/chive-show/app/helpers/keycache"
-	"github.com/bign8/chive-show/app/models"
 	"github.com/mjibson/appstats"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
@@ -18,6 +16,9 @@ import (
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/taskqueue"
 	"google.golang.org/appengine/urlfetch"
+
+	"github.com/bign8/chive-show/keycache"
+	"github.com/bign8/chive-show/models"
 )
 
 const (
