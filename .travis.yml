@@ -19,7 +19,7 @@ deploy:
   edge: true
 - provider: gae
   project: crucial-alpha-706
-  version: default
+  version: prod
   edge: true
 notifications:
   email: false
