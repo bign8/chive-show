@@ -15,7 +15,6 @@ jobs:
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           result-encoding: string
-          debug: true
           script: return 'pr-' + context.payload.number
 
       - name: Deploy to staging
@@ -24,7 +23,6 @@ jobs:
           VERSION: ${{ steps.info.outputs.result }}
           PROJECT: crucial-alpha-706
         run: |
-          echo $VERSION
           gcloud app deploy --version $VERSION --project $PROJECT --no-promote --quiet
           RES=`gcloud app browse --project=$PROJECT --version=$VERSION 2>&1 | tail -n 1`
           echo "::set-output name=url::$RES"
