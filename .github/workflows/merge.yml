@@ -4,7 +4,7 @@ on:
     types: [closed]
 jobs:
   deploy:
-    if: github.event.pull_request.merged == true
+    # if: github.event.pull_request.merged == true
     name: Deploy
     runs-on: ubuntu-latest
     steps:
@@ -18,5 +18,5 @@ jobs:
           PROJECT: crucial-alpha-706
           VERSION: ${{ github.event.pull_request.number }}
         # TODO: figure out how to migrate traffic with existing version
-        # gcloud app versions migrate pr-$VERSION ???
-        run: gcloud app deploy --project $PROJECT --version pr-$VERSION --quiet
+        run: gcloud app versions migrate pr-$VERSION --project $PROJECT --quiet
+        # run: gcloud app deploy --project $PROJECT --version pr-$VERSION --quiet

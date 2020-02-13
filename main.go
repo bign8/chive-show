@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"google.golang.org/appengine"
@@ -11,6 +12,10 @@ import (
 
 func main() {
 	http.HandleFunc("/", http.NotFound) // Default Handler
+	http.HandleFunc("/_ah/warmup", func(w http.ResponseWriter, r *http.Request) {
+		// Needed to be able to migrate traffic on promotion.
+		log.Println("Warmup Done")
+	})
 
 	// Setup Other routes routes
 	api.Init()
