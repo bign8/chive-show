@@ -1,0 +1,68 @@
+name: PR
+on: pull_request
+jobs:
+  pr:
+    name: CD
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: actions/github-script@0.4.0
+        id: info
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          result-encoding: string
+          debug: true
+          script: return 'pr-' + context.payload.number
+
+      - name: Deploy to staging
+        id: deploy
+        env:
+          VERSION: ${{ steps.info.outputs.result }}
+          PROJECT: crucial-alpha-706
+        run: |
+          echo $VERSION
+          gcloud app deploy --version $VERSION --project $PROJECT --no-promote --quiet
+          RES=`gcloud app browse --project=$PROJECT --version=$VERSION 2>&1 | tail -n 1`
+          echo "::set-output name=url::$RES"
+
+      # See: https://octokit.github.io/rest.js/
+      - uses: actions/github-script@0.4.0
+        env:
+          ADDRESS: ${{ steps.deploy.outputs.url }}
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const body = 'Deployed to ' + process.env.ADDRESS + ' for manual testing.'
+            console.log(body, context)
+
+            const opts = github.issues.listComments.endpoint.merge({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            })
+            const comments = await github.paginate(opts)
+
+            // Try to find/update an existing comment
+            for (const comment of comments) {
+              if (comment.body.startsWith('Deployed to ')) {
+                await github.issues.updateComment({
+                  comment_id: comment.id,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: body + '\n\nUpdated with: ' + context.payload.after,
+                })
+                return;
+              }
+            }
+
+            // Create a new one
+            await github.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body,
+            })
