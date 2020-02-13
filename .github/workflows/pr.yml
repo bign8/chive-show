@@ -10,21 +10,14 @@ jobs:
         with:
           service_account_key: ${{ secrets.GCP_SA_KEY }}
 
-      - uses: actions/github-script@0.4.0
-        id: info
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          result-encoding: string
-          script: return 'pr-' + context.payload.number
-
       - name: Deploy to staging
         id: deploy
         env:
-          VERSION: ${{ steps.info.outputs.result }}
+          VERSION: ${{ github.event.pull_request.number }}
           PROJECT: crucial-alpha-706
         run: |
-          gcloud app deploy --version $VERSION --project $PROJECT --no-promote --quiet
-          RES=`gcloud app browse --project=$PROJECT --version=$VERSION 2>&1 | tail -n 1`
+          gcloud app deploy --version pr-$VERSION --project $PROJECT --no-promote --quiet
+          RES=`gcloud app browse --project=$PROJECT --version=pr-$VERSION 2>&1 | tail -n 1`
           echo "::set-output name=url::$RES"
 
       # See: https://octokit.github.io/rest.js/
