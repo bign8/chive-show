@@ -23,3 +23,6 @@ error_handlers:
   - file: static/error.html
   - error_code: over_quota
     file: static/over_quota.html
+
+inbound_services:
+- warmup
