@@ -2,20 +2,18 @@ package cron
 
 import (
 	"context"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
 
-	"github.com/mjibson/appstats"
-	"google.golang.org/appengine"
-	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/delay"
-	"google.golang.org/appengine/log"
-	"google.golang.org/appengine/taskqueue"
-	"google.golang.org/appengine/urlfetch"
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
+	"cloud.google.com/go/datastore"
+	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
 
 	"github.com/bign8/chive-show/keycache"
 	"github.com/bign8/chive-show/models"
@@ -23,7 +21,7 @@ import (
 
 const (
 	// SIZE of a batch
-	SIZE = 10
+	SIZE = 2
 
 	// DEBUG enable if troubleshooting algorithm
 	DEBUG = true
@@ -36,9 +34,14 @@ const (
 )
 
 // Init initializes cron handlers
-func Init() {
-	http.Handle("/cron/parse", appstats.NewHandler(parseFeeds))
-	http.HandleFunc("/cron/delete", delete)
+func Init(store *datastore.Client) {
+	tasker, err := cloudtasks.NewClient(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	http.Handle("/cron/parse", parse(store, tasker))
+	http.Handle("/cron/batch", batch(store))
+	http.Handle("/cron/delete", delete(store))
 }
 
 var (
@@ -50,39 +53,45 @@ func pageURL(idx int) string {
 	return fmt.Sprintf("http://thechive.com/feed/?paged=%d", idx)
 }
 
-func parseFeeds(c context.Context, w http.ResponseWriter, r *http.Request) {
-	fp := new(feedParser)
-	err := fp.Main(c, w)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	} else {
-		fmt.Fprint(w, "Parsed")
+func parse(store *datastore.Client, tasker *cloudtasks.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fp := new(feedParser)
+		err := fp.Main(r.Context(), store, tasker, w)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		} else {
+			fmt.Fprint(w, "Parsed")
+		}
 	}
 }
 
 type feedParser struct {
 	context context.Context
 	client  *http.Client
+	store   *datastore.Client
+	tasker  *cloudtasks.Client
 
 	todo  []int
 	guids map[int64]bool // this could be extremely large
 	posts []models.Post
 }
 
-func (x *feedParser) Main(c context.Context, w http.ResponseWriter) error {
+func (x *feedParser) Main(c context.Context, store *datastore.Client, tasker *cloudtasks.Client, w http.ResponseWriter) error {
 	x.context = c
-	x.client = urlfetch.Client(c)
+	x.client = http.DefaultClient
+	x.store = store
+	x.tasker = tasker
 
 	// Load guids from DB
 	// TODO: do this with sharded keys
-	keys, err := datastore.NewQuery(models.POST).KeysOnly().GetAll(c, nil)
+	keys, err := store.GetAll(c, datastore.NewQuery(models.POST).KeysOnly(), nil)
 	if err != nil {
-		log.Errorf(c, "Error finding keys %v %v", err, appengine.IsOverQuota(err))
+		log.Printf("Error: finding keys %v", err)
 		return err
 	}
 	x.guids = map[int64]bool{}
 	for _, key := range keys {
-		x.guids[key.IntID()] = true
+		x.guids[key.ID] = true
 	}
 	keys = nil
 
@@ -95,7 +104,7 @@ func (x *feedParser) Main(c context.Context, w http.ResponseWriter) error {
 	// Initial recursive edge case
 	isStop, fullStop, err := x.isStop(1)
 	if isStop || fullStop || err != nil {
-		log.Infof(c, "Finished without recursive searching %v", err)
+		log.Printf("INFO: Finished without recursive searching %v", err)
 		if err == nil {
 			err = x.storePosts(x.posts)
 		}
@@ -123,18 +132,59 @@ func (x *feedParser) Main(c context.Context, w http.ResponseWriter) error {
 	}
 
 	if err != nil {
-		log.Errorf(c, "Error in Main %v", err)
+		log.Printf("Error: in Main %v", err)
 	}
 	return err
 }
 
-var processBatchDeferred = delay.Func("process-todo-batch", func(c context.Context, ids []int) {
-	parser := feedParser{
-		context: c,
-		client:  urlfetch.Client(c),
+func batch(store *datastore.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// TODO: ensure this task is coming from appengine
+		if r.Method != http.MethodPost {
+			log.Printf("Batch: got a %s request", r.Method)
+			http.Error(w, "invalid method", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var ids []int
+		defer r.Body.Close()
+		err := json.NewDecoder(r.Body).Decode(&ids)
+		if err != nil {
+			log.Printf("Batch: unmarshal error: %v", err)
+			http.Error(w, "invalid payload", http.StatusExpectationFailed)
+			return
+		}
+
+		parser := feedParser{
+			context: r.Context(),
+			client:  http.DefaultClient,
+			store:   store,
+		}
+		parser.processBatch(ids)
 	}
-	parser.processBatch(ids)
-})
+}
+
+func (x *feedParser) enqueueBatch(ids []int) error {
+	body, err := json.Marshal(ids)
+	if err != nil {
+		return err
+	}
+
+	// https://godoc.org/google.golang.org/genproto/googleapis/cloud/tasks/v2#AppEngineHttpRequest
+	_, err = x.tasker.CreateTask(x.context, &taskspb.CreateTaskRequest{
+		Parent: "projects/crucial-alpha-706/locations/us-central1/queues/default",
+		Task: &taskspb.Task{
+			MessageType: &taskspb.Task_AppEngineHttpRequest{
+				AppEngineHttpRequest: &taskspb.AppEngineHttpRequest{
+					HttpMethod:  taskspb.HttpMethod_POST,
+					RelativeUri: "/cron/batch",
+					Body:        body,
+				},
+			},
+		},
+	})
+	return err
+}
 
 func (x *feedParser) processBatch(ids []int) error {
 	done := make(chan error)
@@ -150,7 +200,7 @@ func (x *feedParser) processBatch(ids []int) error {
 	for i := 0; i < len(ids); i++ {
 		err := <-done
 		if err != nil {
-			log.Errorf(x.context, "error storing feed (at index %d): %v", i, err)
+			log.Printf("error storing feed (at index %d): %v", i, err)
 			return err
 		}
 	}
@@ -158,11 +208,10 @@ func (x *feedParser) processBatch(ids []int) error {
 }
 
 func (x *feedParser) processTodo() error {
-	log.Infof(x.context, "Processing TODO: %v", x.todo)
+	log.Printf("INFO: Processing TODO: %v", x.todo)
+	// TODO: use slice offsets into x.todo array rather than creating batch arrays
 
 	var batch []int
-	var task *taskqueue.Task
-	var allTasks []*taskqueue.Task
 	var err error
 	for _, idx := range x.todo {
 		if batch == nil {
@@ -171,10 +220,7 @@ func (x *feedParser) processTodo() error {
 		batch = append(batch, idx)
 		if len(batch) >= SIZE {
 			if DEFERRED {
-				task, err = processBatchDeferred.Task(batch)
-				if err == nil {
-					allTasks = append(allTasks, task)
-				}
+				err = x.enqueueBatch(batch)
 			} else {
 				err = x.processBatch(batch)
 			}
@@ -186,17 +232,10 @@ func (x *feedParser) processTodo() error {
 	}
 	if len(batch) > 0 {
 		if DEFERRED {
-			task, err = processBatchDeferred.Task(batch)
-			if err == nil {
-				allTasks = append(allTasks, task)
-			}
+			err = x.enqueueBatch(batch)
 		} else {
 			err = x.processBatch(batch)
 		}
-	}
-	if DEFERRED && len(allTasks) > 0 {
-		log.Infof(x.context, "Adding %d task(s) to the default queue", len(allTasks))
-		taskqueue.AddMulti(x.context, allTasks, "default")
 	}
 	return err
 }
@@ -222,7 +261,7 @@ func (x *feedParser) Search(bottom, top int) (err error) {
 	    return infinite_length(bottom, top)  # Tail recursion!!!
 	*/
 	if bottom == top-1 {
-		log.Infof(x.context, "TOP OF RANGE FOUND! @%d", top)
+		log.Printf("INFO: TOP OF RANGE FOUND! @%d", top)
 		x.addRange(bottom, top)
 		return nil
 	}
@@ -260,11 +299,11 @@ func (x *feedParser) isStop(idx int) (isStop, fullStop bool, err error) {
 	// Gather posts as necessary
 	posts, err := x.getAndParseFeed(idx)
 	if err == ErrFeedParse404 {
-		log.Infof(x.context, "Reached the end of the feed list (%v)", idx)
+		log.Printf("INFO: Reached the end of the feed list (%v)", idx)
 		return true, false, nil
 	}
 	if err != nil {
-		log.Errorf(x.context, "Error decoding ChiveFeed: %s", err)
+		log.Printf("Error decoding ChiveFeed: %s", err)
 		return false, false, err
 	}
 
@@ -293,7 +332,7 @@ func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 	url := pageURL(idx)
 
 	// Get Response
-	log.Infof(x.context, "Parsing index %v (%v)", idx, url)
+	log.Printf("INFO: Parsing index %v (%v)", idx, url)
 	resp, err := x.client.Get(url)
 	if err != nil {
 		return nil, err
@@ -339,9 +378,9 @@ func (x *feedParser) storePosts(dirty []models.Post) (err error) {
 		keys = append(keys, key)
 	}
 	if len(keys) > 0 {
-		complete, err := datastore.PutMulti(x.context, keys, posts)
+		complete, err := x.store.PutMulti(x.context, keys, posts)
 		if err == nil {
-			err = keycache.AddKeys(x.context, models.POST, complete)
+			err = keycache.AddKeys(x.context, x.store, models.POST, complete)
 		}
 	}
 	return err
@@ -354,17 +393,17 @@ func (x *feedParser) cleanPost(p *models.Post) (*datastore.Key, error) {
 	}
 	// Remove link posts
 	if link {
-		log.Infof(x.context, "Ignoring links post %v \"%v\"", p.GUID, p.Title)
+		log.Printf("INFO: Ignoring links post %v \"%v\"", p.GUID, p.Title)
 		return nil, fmt.Errorf("Ignoring links post")
 	}
 
 	// Detect video only posts
 	video := regexp.MustCompile("\\([^&]*Video.*\\)")
 	if video.MatchString(p.Title) {
-		log.Infof(x.context, "Ignoring video post %v \"%v\"", p.GUID, p.Title)
+		log.Printf("INFO: Ignoring video post %v \"%v\"", p.GUID, p.Title)
 		return nil, fmt.Errorf("Ignoring video post")
 	}
-	log.Infof(x.context, "Storing post %v \"%v\"", p.GUID, p.Title)
+	log.Printf("INFO: Storing post %v \"%v\"", p.GUID, p.Title)
 
 	// Cleanup post titles
 	clean := regexp.MustCompile("\\W\\(([^\\)]*)\\)$")
@@ -372,7 +411,7 @@ func (x *feedParser) cleanPost(p *models.Post) (*datastore.Key, error) {
 
 	// Post
 	// temp_key := datastore.NewIncompleteKey(x.context, DB_POST_TABLE, nil)
-	key := datastore.NewKey(x.context, models.POST, "", id, nil)
+	key := datastore.IDKey(models.POST, id, nil)
 	return key, nil
 }
 
