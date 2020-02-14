@@ -3,6 +3,7 @@ module github.com/bign8/chive-show
 go 1.12
 
 require (
-	github.com/mjibson/appstats v0.0.0-20151004071057-0542d5f0e87e
-	google.golang.org/appengine v1.6.5
+	cloud.google.com/go v0.52.0
+	cloud.google.com/go/datastore v1.1.0
+	google.golang.org/genproto v0.0.0-20200212174721-66ed5ce911ce
 )

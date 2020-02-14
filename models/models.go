@@ -3,7 +3,7 @@ package models
 import (
 	"encoding/json"
 
-	"google.golang.org/appengine/datastore"
+	"cloud.google.com/go/datastore"
 )
 
 // POST table to store posts in

@@ -1,5 +1,5 @@
 serve:
-	dev_appserver.py app.yaml --host=192.168.0.110 --admin_host=192.168.0.110
+	go run main.go
 .PHONY:=serve
 
 format:
@@ -7,5 +7,14 @@ format:
 .PHONY:=format
 
 deploy:
-	gcloud app deploy --version=test --project=crucial-alpha-706
+	gcloud app deploy --version=test --project=crucial-alpha-706 --no-promote
 .PHONY:=deploy
+
+deps:
+	brew install entr
+.PHONY:=deps
+
+watch:
+	# http://eradman.com/entrproject/
+	ls *.go api/*.go cron/*.go models/*.go keycache/*.go | entr -r make format serve
+.PHONY:=watch
