@@ -13,6 +13,8 @@ import (
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/datastore"
+	"contrib.go.opencensus.io/exporter/stackdriver/propagation"
+	"go.opencensus.io/plugin/ochttp"
 	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
 
 	"github.com/bign8/chive-show/keycache"
@@ -32,6 +34,13 @@ const (
 	// DEFERRED if deferreds should be processed deferred
 	DEFERRED = true
 )
+
+var client = &http.Client{
+	Transport: &ochttp.Transport{
+		// Use Google Cloud propagation format.
+		Propagation: &propagation.HTTPFormat{},
+	},
+}
 
 // Init initializes cron handlers
 func Init(store *datastore.Client) {
@@ -67,7 +76,6 @@ func parse(store *datastore.Client, tasker *cloudtasks.Client) http.HandlerFunc 
 
 type feedParser struct {
 	context context.Context
-	client  *http.Client
 	store   *datastore.Client
 	tasker  *cloudtasks.Client
 
@@ -78,7 +86,6 @@ type feedParser struct {
 
 func (x *feedParser) Main(c context.Context, store *datastore.Client, tasker *cloudtasks.Client, w http.ResponseWriter) error {
 	x.context = c
-	x.client = http.DefaultClient
 	x.store = store
 	x.tasker = tasker
 
@@ -157,7 +164,6 @@ func batch(store *datastore.Client) http.HandlerFunc {
 
 		parser := feedParser{
 			context: r.Context(),
-			client:  http.DefaultClient,
 			store:   store,
 		}
 		parser.processBatch(ids)
@@ -333,7 +339,11 @@ func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 
 	// Get Response
 	log.Printf("INFO: Parsing index %v (%v)", idx, url)
-	resp, err := x.client.Get(url)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req.WithContext(x.context))
 	if err != nil {
 		return nil, err
 	}
