@@ -57,6 +57,13 @@ func main() {
 	tracer := func(w http.ResponseWriter, r *http.Request) {
 		ctx, span := trace.StartSpan(r.Context(), r.Method+" "+r.URL.Path)
 		defer span.End()
+		attrs := []trace.Attribute{
+			trace.StringAttribute("URL", r.URL.String()),
+		}
+		for key := range r.Header {
+			attrs = append(attrs, trace.StringAttribute(key, r.Header.Get(key)))
+		}
+		span.AddAttributes(attrs...)
 		http.DefaultServeMux.ServeHTTP(w, r.WithContext(ctx))
 	}
 

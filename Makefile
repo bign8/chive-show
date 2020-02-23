@@ -1,5 +1,5 @@
 serve:
-	go run main.go
+	GOOGLE_APPLICATION_CREDENTIALS=.github/service-account.json go run main.go
 .PHONY:=serve
 
 format:
