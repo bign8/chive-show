@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/datastore"
 	"contrib.go.opencensus.io/exporter/stackdriver"
+	"contrib.go.opencensus.io/exporter/stackdriver/propagation"
 	"go.opencensus.io/trace"
 
 	"github.com/bign8/chive-show/api"
@@ -54,8 +55,18 @@ func main() {
 	cron.Init(store)
 
 	// Create parent trace spans for all incoming requests (include request metadata)
+	format := propagation.HTTPFormat{}
 	tracer := func(w http.ResponseWriter, r *http.Request) {
-		ctx, span := trace.StartSpan(r.Context(), r.Method+" "+r.URL.Path)
+		name := r.Method + " " + r.URL.Path
+		var (
+			span *trace.Span
+			ctx  context.Context
+		)
+		if parent, ok := format.SpanContextFromRequest(r); ok {
+			ctx, span = trace.StartSpanWithRemoteParent(r.Context(), name, parent)
+		} else {
+			ctx, span = trace.StartSpan(r.Context(), name)
+		}
 		defer span.End()
 		attrs := []trace.Attribute{
 			trace.StringAttribute("URL", r.URL.String()),
