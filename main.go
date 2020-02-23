@@ -53,13 +53,20 @@ func main() {
 	api.Init(store)
 	cron.Init(store)
 
+	// Create parent trace spans for all incoming requests (include request metadata)
+	tracer := func(w http.ResponseWriter, r *http.Request) {
+		ctx, span := trace.StartSpan(r.Context(), r.Method+" "+r.URL.Path)
+		defer span.End()
+		http.DefaultServeMux.ServeHTTP(w, r.WithContext(ctx))
+	}
+
 	// Start the http server.
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 	log.Printf("Listening on port %s", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
+	if err := http.ListenAndServe(":"+port, http.HandlerFunc(tracer)); err != nil {
 		log.Fatal(err)
 	}
 }
