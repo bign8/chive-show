@@ -26,8 +26,6 @@ jobs:
 
     - name: Codecov
       uses: codecov/codecov-action@v1.0.5
-      with:
-        token: "5c59aefa-2f68-41fe-b438-8c0ec2918830"
 
     - name: Build
       run: go build -v .
