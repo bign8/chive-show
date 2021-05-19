@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
@@ -32,77 +31,81 @@ func getURLCount(url *url.URL) int {
 // Actual API functions
 func random(store *datastore.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		count := getURLCount(r.URL)
 		log.Printf("INFO: Requested %v random posts", count)
-		result := NewJSONResponse(http.StatusInternalServerError, "Unknown Error", nil)
 
 		// Pull keys from post keys object
 		keys, err := keycache.GetKeys(r.Context(), store, models.POST)
 		if err != nil {
-			log.Printf("ERR: heleprs.GetKeys %v", err)
-			result.Msg = "Error with keycache GetKeys"
-		} else if len(keys) < count {
+			log.Printf("ERR: keycache.GetKeys %v", err)
+			fail(w, http.StatusInternalServerError, "keycache.GetKeys failure")
+			return
+		}
+
+		// quick sanity check
+		if len(keys) < count {
 			log.Printf("ERR: Not enough keys(%v) for count(%v)", len(keys), count)
-			result.Msg = "Basically empty datastore"
-		} else {
-
-			// Randomize list of keys
-			for i := range keys {
-				j := rand.Intn(i + 1)
-				keys[i], keys[j] = keys[j], keys[i]
-			}
-
-			// Pull posts from datastore
-			data := make([]models.Post, count) // TODO: cache items in memcache too (make a helper)
-			if err := store.GetMulti(r.Context(), keys[:count], data); err != nil {
-				log.Printf("ERR: datastore.GetMulti %v", err)
-				result.Msg = "Error with datastore GetMulti"
-			} else {
-				result = NewJSONResponse(http.StatusOK, "Your amazing data awaits", data)
-			}
+			fail(w, http.StatusInsufficientStorage, "keycache.GetKeys shortage")
+			return
 		}
 
-		if err = result.write(w); err != nil {
-			log.Printf("ERR: result.write %v", err)
+		// Randomize list of keys
+		for i := range keys {
+			j := rand.Intn(i + 1)
+			keys[i], keys[j] = keys[j], keys[i]
 		}
+
+		// Pull posts from datastore
+		data := make([]models.Post, count) // TODO: cache items in memcache too (make a helper)
+		if err := store.GetMulti(r.Context(), keys[:count], data); err != nil {
+			log.Printf("ERR: datastore.GetMulti %v", err)
+			fail(w, http.StatusInternalServerError, "datastore.GetMulti failure")
+			return
+		}
+
+		pass(w, data, "")
 	}
 }
 
-var successCodes = map[int]bool{
-	200: true, // 200 OK
+type core struct {
+	Status string `json:"status"`
+	Code   int    `json:"code"`
 }
 
-// JSONResponse a wrapper for default responses
-type JSONResponse struct {
-	Status string      `json:"status"`
-	Code   int         `json:"code"`
-	Data   interface{} `json:"data"`
-	Msg    string      `json:"msg"`
+type failure struct {
+	core
+	Err string `json:"error"`
 }
 
-// NewJSONResponse generate a JSONResponse
-func NewJSONResponse(code int, message string, data interface{}) JSONResponse {
-	status := "error"
-	if successCodes[code] {
-		status = "success"
-	}
-	return JSONResponse{
-		Code:   code,
-		Data:   data,
-		Msg:    message,
-		Status: status,
-	}
+type response struct {
+	core
+	Data []models.Post `json:"data"`
+	Next string        `json:"next_url,omitempty"`
 }
 
-func (res *JSONResponse) write(w http.ResponseWriter) error {
-	items, err := json.MarshalIndent(&res, "", "  ")
-	var out string
-	if err != nil {
-		out = "{\"status\":\"error\",\"code\":500,\"data\":null,\"msg\":\"Error marshaling data\"}"
-	} else {
-		out = string(items)
-	}
-	fmt.Fprint(w, out)
-	return err
+func fail(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", " ")
+	enc.Encode(failure{
+		core: core{
+			Status: "error",
+			Code:   code,
+		},
+		Err: msg,
+	})
+}
+
+func pass(w http.ResponseWriter, data []models.Post, next string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", " ")
+	enc.Encode(response{
+		core: core{
+			Status: "success",
+			Code:   200,
+		},
+		Data: data,
+		Next: next,
+	})
 }
