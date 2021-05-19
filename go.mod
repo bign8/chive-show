@@ -1,6 +1,6 @@
 module github.com/bign8/chive-show
 
-go 1.12
+go 1.15
 
 require (
 	cloud.google.com/go v0.52.0
