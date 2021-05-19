@@ -12,8 +12,6 @@ jobs:
           project_id: crucial-alpha-706
           service_account_key: ${{ secrets.GCP_SA_KEY }}
           export_default_credentials: true
-      - name: Use gcloud CLI
-        run: gcloud info
       - name: Deploy to staging
         id: deploy
         env:
