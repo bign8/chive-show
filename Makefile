@@ -18,3 +18,8 @@ watch:
 	# http://eradman.com/entrproject/
 	ls *.go api/*.go cron/*.go models/*.go keycache/*.go | entr -r make format serve
 .PHONY:=watch
+
+cover:
+	go test -cover -coverprofile=coverage.cov ./...
+	go tool cover -html=coverage.cov -o static/coverage.html
+.PHONY:=cover

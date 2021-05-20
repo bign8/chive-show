@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"math/rand"
@@ -16,7 +17,9 @@ import (
 
 // Init fired to initialize api
 func Init(store *datastore.Client) {
-	http.Handle("/api/v1/post/random", random(store))
+	http.Handle("/api/v1/post/random", random(store, func(ctx context.Context) ([]*datastore.Key, error) {
+		return keycache.GetKeys(ctx, store, models.POST)
+	}))
 }
 
 // API Helper function
@@ -28,21 +31,24 @@ func getURLCount(url *url.URL) int {
 	return val
 }
 
+type keyFetcher func(context.Context) ([]*datastore.Key, error)
+type datastoreClient interface {
+	GetMulti(context.Context, []*datastore.Key, interface{}) error
+}
+
 // Actual API functions
-func random(store *datastore.Client) http.HandlerFunc {
+func random(store datastoreClient, getPostKeys keyFetcher) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		count := getURLCount(r.URL)
 		log.Printf("INFO: Requested %v random posts", count)
 
 		// Pull keys from post keys object
-		keys, err := keycache.GetKeys(r.Context(), store, models.POST)
+		keys, err := getPostKeys(r.Context())
 		if err != nil {
 			log.Printf("ERR: keycache.GetKeys %v", err)
 			fail(w, http.StatusInternalServerError, "keycache.GetKeys failure")
 			return
 		}
-
-		// quick sanity check
 		if len(keys) < count {
 			log.Printf("ERR: Not enough keys(%v) for count(%v)", len(keys), count)
 			fail(w, http.StatusInsufficientStorage, "keycache.GetKeys shortage")
@@ -62,7 +68,6 @@ func random(store *datastore.Client) http.HandlerFunc {
 			fail(w, http.StatusInternalServerError, "datastore.GetMulti failure")
 			return
 		}
-
 		pass(w, data, "")
 	}
 }
