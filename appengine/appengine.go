@@ -11,11 +11,15 @@ import (
 	"go.opencensus.io/trace"
 )
 
+func AppID(context.Context) string {
+	return "crucial-alpha-706"
+}
+
 func Main() {
 
 	// Create and register a OpenCensus Stackdriver Trace exporter.
 	exporter, err := stackdriver.NewExporter(stackdriver.Options{
-		ProjectID: "crucial-alpha-706",
+		ProjectID: AppID(context.TODO()),
 	})
 	if err != nil {
 		log.Fatal(err)

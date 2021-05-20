@@ -1,7 +1,9 @@
 package models
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 
 	"cloud.google.com/go/datastore"
 )
@@ -54,4 +56,15 @@ func (x *Post) Save() (props []datastore.Property, err error) {
 		return nil, err
 	}
 	return datastore.SaveStruct(x)
+}
+
+// Storage based errors
+// TODO: wrap the base errors better
+var (
+	ErrNotEnough = errors.New("not enough")
+)
+
+// Store defines a general abstraction over storage operations
+type Store interface {
+	ListPosts(ctx context.Context, count int) ([]Post, error)
 }
