@@ -7,18 +7,26 @@
     <title>theChive Mobile Scroller</title>
     <style>
         /* Inline styles to avoid content flash */
+        .scroller {
+          max-width: 480px; /* Usual Mobile width */
+          margin: 0 auto;
+        }
         .post > :first-child {
-            text-align: center;
-            width: 100%;
-            display: inline-block;
-            position: sticky;
-            top: 0;
-            background: #FFF;
-            box-shadow: 0px 2px 5px rgba(0,0,0,0.5);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            padding: 0 10px;
+          text-align: center;
+          width: 100%;
+          display: inline-block;
+          position: sticky;
+          top: 0;
+          background: #FFF;
+          box-shadow: 0px 2px 5px rgba(0,0,0,0.5);
+            
+        }
+        .post h5 {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          padding: 0 10px;
+          margin-bottom: 0;
         }
     </style>
   </head>
