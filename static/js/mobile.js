@@ -6,8 +6,9 @@ function create_post(post) {
     let div = document.createElement('div')
     div.classList.add('post')
 
-    let title = document.createElement('h1')
+    let title = document.createElement('h5')
     title.innerText = post.title
+    title.title = post.title
     div.append(title)
 
     let pre = document.createElement('pre')
@@ -24,7 +25,7 @@ function pump() {
         return res.data
     }).then(posts => {
         for (let post of posts) scroller.append(create_post(post))
-        observer.observe(scroller.lastChild)
+        observer.observe(scroller.lastChild.previousSibling)
     });
 }
 

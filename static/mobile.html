@@ -8,13 +8,17 @@
     <style>
         /* Inline styles to avoid content flash */
         .post > :first-child {
-            text-align:center;
-            width:100%;
-            display:inline-block;
-            position:sticky;
-            top:0;
-            background:#FFF;
+            text-align: center;
+            width: 100%;
+            display: inline-block;
+            position: sticky;
+            top: 0;
+            background: #FFF;
             box-shadow: 0px 2px 5px rgba(0,0,0,0.5);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0 10px;
         }
     </style>
   </head>
