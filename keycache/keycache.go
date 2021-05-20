@@ -1,5 +1,7 @@
 package keycache
 
+// TODO: move this package into models/datastore once cron is updated
+
 import (
 	"context"
 	"log"

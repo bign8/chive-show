@@ -10,6 +10,7 @@ import (
 	"github.com/bign8/chive-show/api"
 	"github.com/bign8/chive-show/appengine"
 	"github.com/bign8/chive-show/cron"
+	datastoreM "github.com/bign8/chive-show/models/datastore"
 )
 
 func main() {
@@ -21,15 +22,20 @@ func main() {
 		http.Error(w, "warm!", http.StatusOK)
 	})
 
+	// TODO: MOVE STORE CONSTRUCTOR INTO models/datastore once CRON is updated
 	// https://cloud.google.com/docs/authentication/production
 	// GOOGLE_APPLICATION_CREDENTIALS=<path-to>/service-account.json
-	store, err := datastore.NewClient(context.Background(), "crucial-alpha-706")
+	store, err := datastore.NewClient(context.Background(), appengine.AppID(context.TODO()))
+	if err != nil {
+		panic(err)
+	}
+	modelStore, err := datastoreM.NewStore(store)
 	if err != nil {
 		panic(err)
 	}
 
 	// Setup Other routes routes
-	api.Init(store)
+	api.Init(modelStore)
 	cron.Init(store)
 
 	appengine.Main()

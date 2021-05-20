@@ -1,28 +1,20 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"log"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
 
-	"cloud.google.com/go/datastore"
-
-	"github.com/bign8/chive-show/keycache"
 	"github.com/bign8/chive-show/models"
 )
 
 // Init fired to initialize api
-func Init(store *datastore.Client) {
-	http.Handle("/api/v1/post/random", random(store, func(ctx context.Context) ([]*datastore.Key, error) {
-		return keycache.GetKeys(ctx, store, models.POST)
-	}))
+func Init(store models.Store) {
+	http.Handle("/api/v1/post/random", random(store))
 }
 
-// API Helper function
 func getURLCount(url *url.URL) int {
 	val, err := strconv.Atoi(url.Query().Get("count"))
 	if err != nil || val > 30 || val < 1 {
@@ -31,86 +23,56 @@ func getURLCount(url *url.URL) int {
 	return val
 }
 
-type keyFetcher func(context.Context) ([]*datastore.Key, error)
-type datastoreClient interface {
-	GetMulti(context.Context, []*datastore.Key, interface{}) error
-}
-
-// Actual API functions
-func random(store datastoreClient, getPostKeys keyFetcher) http.HandlerFunc {
+// Return a list of random posts from the chive.
+func random(store models.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", " ")
+
+		// Parse request parameters
 		count := getURLCount(r.URL)
 		log.Printf("INFO: Requested %v random posts", count)
 
-		// Pull keys from post keys object
-		keys, err := getPostKeys(r.Context())
+		posts, err := store.ListPosts(r.Context(), count)
+
+		// Failed response
 		if err != nil {
-			log.Printf("ERR: keycache.GetKeys %v", err)
-			fail(w, http.StatusInternalServerError, "keycache.GetKeys failure")
-			return
-		}
-		if len(keys) < count {
-			log.Printf("ERR: Not enough keys(%v) for count(%v)", len(keys), count)
-			fail(w, http.StatusInsufficientStorage, "keycache.GetKeys shortage")
+			log.Printf("api(store.ListPosts): %v", err)
+			enc.Encode(failure{
+				common: common{
+					Status: "error",
+					Code:   500,
+				},
+				Err: "unable to fetch posts",
+			})
 			return
 		}
 
-		// Randomize list of keys
-		for i := range keys {
-			j := rand.Intn(i + 1)
-			keys[i], keys[j] = keys[j], keys[i]
-		}
-
-		// Pull posts from datastore
-		data := make([]models.Post, count) // TODO: cache items in memcache too (make a helper)
-		if err := store.GetMulti(r.Context(), keys[:count], data); err != nil {
-			log.Printf("ERR: datastore.GetMulti %v", err)
-			fail(w, http.StatusInternalServerError, "datastore.GetMulti failure")
-			return
-		}
-		pass(w, data, "")
+		// Successful response!
+		enc.Encode(response{
+			common: common{
+				Status: "success",
+				Code:   200,
+			},
+			Data: posts,
+			// Next: next,
+		})
 	}
 }
 
-type core struct {
+type common struct {
 	Status string `json:"status"`
 	Code   int    `json:"code"`
 }
 
 type failure struct {
-	core
+	common
 	Err string `json:"error"`
 }
 
 type response struct {
-	core
+	common
 	Data []models.Post `json:"data"`
 	Next string        `json:"next_url,omitempty"`
-}
-
-func fail(w http.ResponseWriter, code int, msg string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", " ")
-	enc.Encode(failure{
-		core: core{
-			Status: "error",
-			Code:   code,
-		},
-		Err: msg,
-	})
-}
-
-func pass(w http.ResponseWriter, data []models.Post, next string) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", " ")
-	enc.Encode(response{
-		core: core{
-			Status: "success",
-			Code:   200,
-		},
-		Data: data,
-		Next: next,
-	})
 }
