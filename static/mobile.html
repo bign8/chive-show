@@ -7,21 +7,25 @@
     <title>theChive Mobile Scroller</title>
     <style>
         /* Inline styles to avoid content flash */
+        body {
+          background-color: gray
+        }
         .scroller {
           max-width: 480px; /* Usual Mobile width */
           margin: 0 auto;
         }
         .post > :first-child {
-          text-align: center;
           width: 100%;
           display: inline-block;
           position: sticky;
           top: 0;
           background: #FFF;
           box-shadow: 0px 2px 5px rgba(0,0,0,0.5);
+          cursor: pointer;
             
         }
         .post h5 {
+          text-align: center;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
