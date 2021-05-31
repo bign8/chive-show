@@ -2,10 +2,13 @@ package cron
 
 import (
 	"context"
+	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/anaskhan96/soup"
@@ -25,7 +28,8 @@ func sample(w http.ResponseWriter, r *http.Request) {
 	// 	panic(err)
 	// }
 
-	err := mine(w, "https://thechive.com/2021/05/20/daily-afternoon-randomness-49-photos-1287/")
+	// err := mine(w, "https://thechive.com/2021/05/20/daily-afternoon-randomness-49-photos-1287/")
+	err := mine(w, "https://thechive.com/2021/05/28/daily-morning-awesomeness-38-photos-151/")
 	if err != nil {
 		panic(err)
 	}
@@ -88,12 +92,59 @@ func sampled(ctx context.Context, idx int) ([]models.Post, error) {
 func mine(w http.ResponseWriter, link string) error {
 	res, err := soup.Get(link)
 	if err != nil {
-		panic(err)
+		log.Printf("mine(%s): unable to fetch: %s", link, err)
+		return nil
 	}
 	doc := soup.HTMLParse(res)
+
 	for _, figure := range doc.FindAll("figure") {
-		fmt.Fprintf(w, "Figure: %s<br/>\n", figure.Find("img").FullText())
+		img := stripQuery(figure.Find("img").Attrs()["src"])
+		fmt.Fprintf(w, "RAW HTML : %s\n\n", img)
 	}
-	// log.Printf("Got soup: %v", doc)
+
+	// parse CHIVE_GALLERY_ITEMS from script id='chive-theme-js-js-extra' into JSON
+	// TODO: use match the image prefix? "https:\/\/thechive.com\/wp-content\/uploads\/" in the HTML and parse to closing "
+	src := doc.Find("script", "id", "chive-theme-js-js-extra").FullText()
+	idx := strings.IndexByte(src, '{')
+	if idx < 0 {
+		return errors.New("unable to find opening brace")
+	}
+	src = src[idx:]
+	idx = strings.LastIndexByte(src, '}')
+	if idx < 0 {
+		return errors.New("unable to find closing brace")
+	}
+	src = src[:idx+1]
+	var what struct {
+		Items []struct {
+			HTML *string `json:"html,omitempty"`
+		} `json:"items"`
+	}
+	err = json.Unmarshal([]byte(src), &what)
+	if err != nil {
+		panic(err)
+	}
+
+	// Parse HTML attributes of JSON to get images
+	for i, obj := range what.Items {
+		if obj.HTML == nil {
+			log.Printf("no HTML found in fragment %d (embedded in post?)", i)
+			continue
+		}
+		ele := soup.HTMLParse(*obj.HTML)
+		if ele.Error != nil {
+			log.Printf("unable to parse post fragment %d", i)
+			continue
+		}
+		imgs := ele.FindAll("img")
+		if len(imgs) == 0 {
+			log.Printf("no images found in fragment %d (video?)", i)
+			continue
+		}
+		for _, img := range imgs {
+			img := stripQuery(img.Attrs()["src"])
+			fmt.Fprintf(w, "JSON+HTML: %s\n\n", img)
+		}
+	}
 	return nil
 }
