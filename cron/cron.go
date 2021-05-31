@@ -51,6 +51,7 @@ func Init(store *datastore.Client) {
 	http.Handle("/cron/parse", parse(store, tasker))
 	http.Handle("/cron/batch", batch(store))
 	http.Handle("/cron/delete", delete(store))
+	http.HandleFunc("/cron/sample", sample)
 }
 
 var (
