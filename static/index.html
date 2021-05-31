@@ -1,111 +1,34 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>theChive Wallboard</title>
-        <meta name="description" content="TODO">
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-        <link rel="stylesheet" href="/css/bootstrap.min.css">
-        <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous"> -->
-        <link rel="stylesheet" href="/css/main.css">
-        <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
-    </head>
-    <body>
-        <div id="wrap">
-            <div class="navbar navbar-default">
-                <div class="container">
-                    <div class="navbar-header">
-                        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-responsive-collapse">
-                            <span class="icon-bar"></span>
-                            <span class="icon-bar"></span>
-                            <span class="icon-bar"></span>
-                        </button>
-                        <a class="navbar-brand" href="#">
-                            the<span style="color:#02fd00">C</span>hive show
-                            <!-- <img alt="theChive" src="img/chive-small.png" /> -->
-                        </a>
-                    </div>
-
-                    <div class="navbar-collapse collapse navbar-responsive-collapse">
-                        <p class="navbar-text" id="feed-title">Loading...</p>
-
-                        <!-- <ul class="nav navbar-nav navbar-right">
-                            <li>
-                                <button type="button" class="btn btn-sm btn-default navbar-btn">Sign in</button>
-                            </li>
-                            <li class="dropdown">
-                                <a href="#" class="dropdown-toggle" data-toggle="dropdown">John Doe <b class="caret"></b></a>
-                                <ul class="dropdown-menu">
-                                    <li><a href="#">Favorites</a></li>
-                                    <li><a href="#">Settings</a></li>
-                                    <li class="divider"></li>
-                                    <li><a href="#">Log out</a></li>
-                                </ul>
-                            </li>
-                        </ul> -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- <div class="container">
-
-            </div> -->
-
-            <div class="frame active" id="frame-1">
-                <div class="push"></div>
-                <div class="container">
-                    <img src="img/chive.png" />
-                </div>
-            </div>
-
-            <div class="frame" id="frame-2">
-                <div class="push"></div>
-                <div class="container">
-                    <img src="img/chive.png" />
-                </div>
-            </div>
-
-            <div class="next frame active">
-                <div class="push" style="margin-bottom:-20px"></div>
-                <div class="container">
-                    <button class="btn btn-sm btn-default pull-right" id="btn-next">
-                        <span class="glyphicon glyphicon-chevron-right"></span>
-                    </button>
-                    <svg id="timer_image" height="100" width="100" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="pull-left">
-                        <defs>
-                            <clipPath id="myClip">
-                                <circle cx="50" cy="50" r="46"/>
-                            </clipPath>
-                        </defs>
-                        <path d="M 50 50 m -48, 0 a 48,48 0 1,1 96,0 a 48,48 0 1,1 -96,0" style="stroke: rgb(2, 253, 0); stroke-width: 4px; stroke-dasharray: 301.635223388672px, 301.635223388672px; stroke-dashoffset: 0px;">
-                            <animateTransform attributeName="transform" type="rotate" from="0 50 50" to="360 50 50" dur="10s" repeatCount="indefinite" />
-                            <animate attributeType="CSS" attributeName="stroke-dashoffset" from="-301.6" to="301.6" dur="40s" repeatCount="indefinite" />
-                        </path>
-                        <image id="author" clip-path="url(#myClip)" x="4" y="4" width="92" height="92" xlink:href="data:image/gif;base64,R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=" />
-                    </svg>
-                </div>
-            </div>
-
-            <div id="push"></div>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous">
+    <title>Chive Experiences</title>
+  </head>
+  <body>
+    <div class="container px-4 py-5" id="hanging-icons">
+      <h1 class="border-bottom">Welcome to the<span style="color:#02fd00">C</span>hive Experience!</h1>
+      <p class="lead">theChive is an awesome source of endless visual entertainment! These are some experiments of different ways to interact with theChive's published visual content.</p>
+      <p>The source for this project can be found on <a href="https://github.com/bign8/chive-show">github</a>.  This site has nothing to do with theChive or their backing media group.  Use at your own risk.</p>
+      <div class="row g-4 py-5">
+        <div class="col">
+          <h2>Desktop</h2>
+          <p>The Chive's website is already awesome for desktop viewing!</p>
+          <a href="https://thechive.com/" class="btn btn-primary">Launch!</a>
         </div>
-
-        <div id="footer" class="navbar navbar-default">
-            <div class="container">
-                <p class="navbar-text" id="posted">Loading...</p>
-                <p class="navbar-text nav navbar-nav navbar-right" id="categories">
-                    <span class="label label-default">Default</span>
-                    <span class="label label-primary">Primary</span>
-                    <span class="label label-success">Success</span>
-                    <span class="label label-warning">Warning</span>
-                    <span class="label label-danger">Danger</span>
-                    <span class="label label-info">Info</span>
-                </p>
-            </div>
+        <div class="col">
+          <h2>Mobile</h2>
+          <p>A continuous sroller for your mobile viewing pleasure!</p>
+          <a href="/mobile.html" class="btn btn-primary">Launch!</a>
         </div>
-
-        <script src="/js/jquery-2.1.1.min.js"></script>
-        <script src="/js/bootstrap.min.js"></script>
-        <script src="/js/main.js"></script>
-    </body>
+        <div class="col">
+          <h2>Wallboard</h2>
+          <p>Automatically advancing, single image view for 30s at a time.</p>
+          <a href="/board.html" class="btn btn-primary">Launch!</a>
+        </div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4" crossorigin="anonymous"></script>
+  </body>
 </html>
