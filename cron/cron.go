@@ -58,7 +58,7 @@ func Init(store *datastore.Client) {
 
 var (
 	// ErrFeedParse404 if feed page is not found
-	ErrFeedParse404 = fmt.Errorf("Feed parcing recieved a %d Status Code", 404)
+	ErrFeedParse404 = fmt.Errorf("feed parcing recieved a %d Status Code", 404)
 )
 
 func pageURL(idx int) string {
@@ -417,7 +417,12 @@ func mine(post *models.Post) error {
 
 	// parse CHIVE_GALLERY_ITEMS from script id='chive-theme-js-js-extra' into JSON
 	// TODO: use match the image prefix? "https:\/\/thechive.com\/wp-content\/uploads\/" in the HTML and parse to closing "
-	src := doc.Find("script", "id", "chive-theme-js-js-extra").FullText()
+	js := doc.Find("script", "id", "chive-theme-js-js-extra")
+	if js.Error != nil {
+		log.Printf("Unable to find script logic: %v %v", post.GUID, js.Error)
+		return nil
+	}
+	src := js.FullText()
 	idx := strings.IndexByte(src, '{')
 	if idx < 0 {
 		return errors.New("unable to find opening brace")
@@ -494,19 +499,19 @@ func (x *feedParser) cleanPost(p *models.Post) (*datastore.Key, error) {
 	// Remove link posts
 	if link {
 		log.Printf("INFO: Ignoring links post %v \"%v\"", p.GUID, p.Title)
-		return nil, fmt.Errorf("Ignoring links post")
+		return nil, fmt.Errorf("ignoring links post")
 	}
 
 	// Detect video only posts
-	video := regexp.MustCompile("\\([^&]*Video.*\\)")
+	video := regexp.MustCompile(`\([^&]*Video.*\)`)
 	if video.MatchString(p.Title) {
 		log.Printf("INFO: Ignoring video post %v \"%v\"", p.GUID, p.Title)
-		return nil, fmt.Errorf("Ignoring video post")
+		return nil, fmt.Errorf("ignoring video post")
 	}
 	log.Printf("INFO: Storing post %v \"%v\"", p.GUID, p.Title)
 
 	// Cleanup post titles
-	clean := regexp.MustCompile("\\W\\(([^\\)]*)\\)$")
+	clean := regexp.MustCompile(`\W\(([^\)]*)\)$`)
 	p.Title = clean.ReplaceAllLiteralString(p.Title, "")
 
 	// Post
