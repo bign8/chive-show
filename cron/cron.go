@@ -4,16 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"cloud.google.com/go/datastore"
 	"contrib.go.opencensus.io/exporter/stackdriver/propagation"
+	"github.com/anaskhan96/soup"
 	"go.opencensus.io/plugin/ochttp"
 	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
 
@@ -55,7 +58,7 @@ func Init(store *datastore.Client) {
 
 var (
 	// ErrFeedParse404 if feed page is not found
-	ErrFeedParse404 = fmt.Errorf("Feed parcing recieved a %d Status Code", 404)
+	ErrFeedParse404 = fmt.Errorf("feed parcing recieved a %d Status Code", 404)
 )
 
 func pageURL(idx int) string {
@@ -352,7 +355,7 @@ func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 		if resp.StatusCode == 404 {
 			return nil, ErrFeedParse404
 		}
-		return nil, fmt.Errorf("Feed parcing recieved a %d Status Code", resp.StatusCode)
+		return nil, fmt.Errorf("feed parcing recieved a %d Status Code", resp.StatusCode)
 	}
 
 	// Decode Response
@@ -367,33 +370,125 @@ func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 	// Cleanup Response
 	for idx := range feed.Items {
 		post := &feed.Items[idx]
+		if err = mine(post); err != nil {
+			log.Printf("Unable to mine page for details: %s", post.Link)
+		}
 		for i, img := range post.Media {
 			post.Media[i].URL = stripQuery(img.URL)
 		}
-		post.MugShot = post.Media[0].URL
-		post.Media = post.Media[1:]
+
+		// Find the "author" image and remove it from the "media" set
+		var found bool
+		for i, media := range post.Media {
+			if media.Category == "author" {
+				found = true
+				post.MugShot = media.URL
+				post.Media = append(post.Media[:i], post.Media[i+1:]...)
+				break
+			}
+		}
+		if !found {
+			log.Printf("Unable to find author for: %#v", post)
+			post.MugShot = post.Media[0].URL
+			post.Media = post.Media[1:]
+		}
 	}
 	return feed.Items, err
 }
 
-func (x *feedParser) storePosts(dirty []models.Post) (err error) {
+func mine(post *models.Post) error {
+	res, err := soup.GetWithClient(post.Link, client)
+	if err != nil {
+		log.Printf("mine(%s): unable to fetch: %s", post.Link, err)
+		return nil
+	}
+	doc := soup.HTMLParse(res)
+
+	for _, figure := range doc.FindAll("figure") {
+		obj := figure.Find("img")
+		if obj.Error != nil {
+			log.Printf("Unable to find img: %s: %v", post.Link, obj.Error)
+			continue
+		}
+		post.Media = append(post.Media, models.Img{
+			URL: obj.Attrs()["src"],
+		})
+	}
+
+	// parse CHIVE_GALLERY_ITEMS from script id='chive-theme-js-js-extra' into JSON
+	// TODO: use match the image prefix? "https:\/\/thechive.com\/wp-content\/uploads\/" in the HTML and parse to closing "
+	js := doc.Find("script", "id", "chive-theme-js-js-extra")
+	if js.Error != nil {
+		log.Printf("Unable to find script logic: %v %v", post.GUID, js.Error)
+		return nil
+	}
+	src := js.FullText()
+	idx := strings.IndexByte(src, '{')
+	if idx < 0 {
+		return errors.New("unable to find opening brace")
+	}
+	src = src[idx:]
+	idx = strings.LastIndexByte(src, '}')
+	if idx < 0 {
+		return errors.New("unable to find closing brace")
+	}
+	src = src[:idx+1]
+	var what struct {
+		Items []struct {
+			HTML *string `json:"html,omitempty"`
+		} `json:"items"`
+	}
+	err = json.Unmarshal([]byte(src), &what)
+	if err != nil {
+		panic(err)
+	}
+
+	// Parse HTML attributes of JSON to get images
+	for i, obj := range what.Items {
+		if obj.HTML == nil {
+			log.Printf("no HTML found in fragment %d (embedded in post?)", i)
+			continue
+		}
+		ele := soup.HTMLParse(*obj.HTML)
+		if ele.Error != nil {
+			log.Printf("unable to parse post fragment %d", i)
+			continue
+		}
+		imgs := ele.FindAll("img")
+		if len(imgs) == 0 {
+			log.Printf("no images found in fragment %d (video?)", i)
+			continue
+		}
+		for _, img := range imgs {
+			post.Media = append(post.Media, models.Img{
+				URL: img.Attrs()["src"],
+			})
+		}
+	}
+	return nil
+}
+
+func (x *feedParser) storePosts(dirty []models.Post) error {
 	var posts []models.Post
 	var keys []*datastore.Key
 	for _, post := range dirty {
 		key, err := x.cleanPost(&post)
 		if err != nil {
+			log.Printf("Unable to clean post: %v %v", post.GUID, err)
 			continue
 		}
 		posts = append(posts, post)
 		keys = append(keys, key)
 	}
-	if len(keys) > 0 {
-		complete, err := x.store.PutMulti(x.context, keys, posts)
-		if err == nil {
-			err = keycache.AddKeys(x.context, x.store, models.POST, complete)
-		}
+	if len(keys) == 0 {
+		return nil
 	}
-	return err
+	complete, err := x.store.PutMulti(x.context, keys, posts)
+	if err != nil {
+		log.Printf("Problem storing Post: %v %v", keys, err)
+		return err
+	}
+	return keycache.AddKeys(x.context, x.store, models.POST, complete)
 }
 
 func (x *feedParser) cleanPost(p *models.Post) (*datastore.Key, error) {
@@ -404,19 +499,19 @@ func (x *feedParser) cleanPost(p *models.Post) (*datastore.Key, error) {
 	// Remove link posts
 	if link {
 		log.Printf("INFO: Ignoring links post %v \"%v\"", p.GUID, p.Title)
-		return nil, fmt.Errorf("Ignoring links post")
+		return nil, fmt.Errorf("ignoring links post")
 	}
 
 	// Detect video only posts
-	video := regexp.MustCompile("\\([^&]*Video.*\\)")
+	video := regexp.MustCompile(`\([^&]*Video.*\)`)
 	if video.MatchString(p.Title) {
 		log.Printf("INFO: Ignoring video post %v \"%v\"", p.GUID, p.Title)
-		return nil, fmt.Errorf("Ignoring video post")
+		return nil, fmt.Errorf("ignoring video post")
 	}
 	log.Printf("INFO: Storing post %v \"%v\"", p.GUID, p.Title)
 
 	// Cleanup post titles
-	clean := regexp.MustCompile("\\W\\(([^\\)]*)\\)$")
+	clean := regexp.MustCompile(`\W\(([^\)]*)\)$`)
 	p.Title = clean.ReplaceAllLiteralString(p.Title, "")
 
 	// Post
