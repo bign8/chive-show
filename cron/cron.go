@@ -397,7 +397,7 @@ func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 }
 
 func mine(post *models.Post) error {
-	res, err := soup.Get(post.Link)
+	res, err := soup.GetWithClient(post.Link, client)
 	if err != nil {
 		log.Printf("mine(%s): unable to fetch: %s", post.Link, err)
 		return nil
