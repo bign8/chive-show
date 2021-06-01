@@ -35,8 +35,8 @@ type Post struct {
 	Creator string   `datastore:"creator" json:"creator" xml:"creator"`
 
 	// Attributes tweaked to minimize transactions (LoadSaver stuff)
-	MediaBytes []byte `datastore:"media"   json:"-"       xml:"-"`
-	Media      []Img  `datastore:"-"       json:"media"   xml:"content"`
+	MediaBytes []byte `datastore:"media,noindex"   json:"-"       xml:"-"`
+	Media      []Img  `datastore:"-"               json:"media"   xml:"content"`
 
 	// Manually built attributes from post
 	MugShot string `datastore:"mugshot" json:"mugshot" xml:"-"`
