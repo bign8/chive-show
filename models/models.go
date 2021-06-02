@@ -66,5 +66,20 @@ var (
 
 // Store defines a general abstraction over storage operations
 type Store interface {
-	ListPosts(ctx context.Context, count int) ([]Post, error)
+	Random(ctx context.Context, opts *RandomOptions) (*RandomResult, error)
+	// List(ctx context.Context, opts *ListOptions) ([]Post, error)
+	// Save(ctx context.Context, post Post) error
+	// Create(ctx context.Context, posts []Post) error
+	// Delete(ctx context.Context, ids []int) error
+}
+
+type RandomOptions struct {
+	Count  int
+	Cursor string
+}
+
+type RandomResult struct {
+	Posts []Post
+	Next  *RandomOptions
+	Prev  *RandomOptions
 }
