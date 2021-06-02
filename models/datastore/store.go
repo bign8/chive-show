@@ -60,7 +60,7 @@ func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models
 		log.Printf("ERR: keycache.GetKeys %v", err)
 		return nil, err
 	}
-	if len(keys) < opts.Count {
+	if len(keys) < opts.Count || len(keys) < offset {
 		log.Printf("ERR: Not enough keys(%v) for count(%v)", len(keys), opts.Count)
 		return nil, models.ErrNotEnough
 	}
@@ -73,9 +73,6 @@ func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models
 				capacity = key.ID
 			}
 		}
-	} else {
-		// TODO: delete keys that are newer than "capacity"
-		log.Printf("WIP!")
 	}
 
 	// Initialize seed to random seed if none provided
@@ -91,23 +88,37 @@ func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models
 	}
 
 	// Pull posts from datastore
-	// TODO: include limit logic here
+	max := opts.Count + offset
+	if max > len(keys) {
+		max = len(keys)
+	}
 	data := make([]models.Post, opts.Count) // TODO: cache items in memcache too (make a helper)
-	if err := s.store.GetMulti(ctx, keys[:opts.Count], data); err != nil {
+	if err := s.store.GetMulti(ctx, keys[offset:max], data); err != nil {
 		log.Printf("ERR: datastore.GetMulti %v", err)
 		return nil, err
 	}
-	return &models.RandomResult{
-		Posts: data,
-		Next: &models.RandomOptions{
+
+	// Setup cursors for next go around
+	var (
+		next *models.RandomOptions
+		prev *models.RandomOptions
+	)
+	if max != len(keys) {
+		next = &models.RandomOptions{
 			Count:  opts.Count,
-			Cursor: strconv.Itoa(offset+opts.Count) + "~" + strconv.FormatInt(seed, 36) + "~" + strconv.FormatInt(capacity, 36),
-			// TODO: remove if no next link is possible
-		},
-		Prev: &models.RandomOptions{
+			Cursor: strconv.Itoa(max) + "~" + strconv.FormatInt(seed, 36) + "~" + strconv.FormatInt(capacity, 36),
+		}
+	}
+	if offset != 0 {
+		prev = &models.RandomOptions{
 			Count:  opts.Count,
 			Cursor: strconv.Itoa(offset-opts.Count) + "~" + strconv.FormatInt(seed, 36) + "~" + strconv.FormatInt(capacity, 36),
-			// TODO: remove if no previous link possible
-		},
+		}
+	}
+
+	return &models.RandomResult{
+		Posts: data,
+		Next:  next,
+		Prev:  prev,
 	}, nil
 }
