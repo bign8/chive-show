@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/datastore"
+
 	"github.com/bign8/chive-show/keycache"
 	"github.com/bign8/chive-show/models"
 )
@@ -19,10 +20,20 @@ func NewStore(store *datastore.Client) (*Store, error) {
 }
 
 type Store struct {
-	store *datastore.Client
+	store storeDatastoreClient
 }
 
-var _ models.Store = (*Store)(nil)
+type storeDatastoreClient interface {
+	Get(context.Context, *datastore.Key, interface{}) error
+	GetAll(context.Context, *datastore.Query, interface{}) ([]*datastore.Key, error)
+	Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error)
+	GetMulti(context.Context, []*datastore.Key, interface{}) error
+}
+
+var (
+	_       models.Store = (*Store)(nil)
+	getKeys              = keycache.GetKeys
+)
 
 func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models.RandomResult, error) {
 	if opts == nil {
@@ -55,7 +66,7 @@ func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models
 	}
 
 	// Pull keys from post keys object
-	keys, err := keycache.GetKeys(ctx, s.store, models.POST)
+	keys, err := getKeys(ctx, s.store, models.POST)
 	if err != nil {
 		log.Printf("ERR: keycache.GetKeys %v", err)
 		return nil, err
