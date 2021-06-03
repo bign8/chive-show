@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"strconv"
 
@@ -14,15 +13,6 @@ import (
 // Init fired to initialize api
 func Init(store models.Store) {
 	http.Handle("/api/v1/post/random", random(store))
-	http.HandleFunc("/api/v0/debug", debug)
-}
-
-func debug(w http.ResponseWriter, r *http.Request) {
-	bits, err := httputil.DumpRequest(r, true)
-	if err != nil {
-		panic(err)
-	}
-	w.Write(bits)
 }
 
 func getURLCount(url *url.URL) int {

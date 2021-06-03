@@ -24,9 +24,7 @@ type Store struct {
 }
 
 type storeDatastoreClient interface {
-	Get(context.Context, *datastore.Key, interface{}) error
-	GetAll(context.Context, *datastore.Query, interface{}) ([]*datastore.Key, error)
-	Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error)
+	keycache.DatastoreClient
 	GetMulti(context.Context, []*datastore.Key, interface{}) error
 }
 
