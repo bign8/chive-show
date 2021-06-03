@@ -121,8 +121,12 @@ function create_post(post) {
 
 // load the next page of posts
 function pump() {
+    if (!next_link) {
+        alert("Thats everyting! Go for a walk!")
+        return
+    }
     fetch(next_link).then(r => r.json()).then(res => {
-        // TODO: listen to server's response and stream through posts this way
+        next_link = res.next_url
         return res.data
     }).then(posts => {
         for (let post of posts) scroller.append(create_post(post))

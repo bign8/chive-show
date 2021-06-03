@@ -3,6 +3,7 @@ package cron
 import (
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -42,4 +43,10 @@ func TestMine(t *testing.T) {
 	if len(post.Media) != 3 {
 		t.Fatalf("Expected 3 media, got %d", len(post.Media))
 	}
+}
+
+func TestDebug(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/cron/debug", nil)
+	w := httptest.NewRecorder()
+	debug(w, r)
 }

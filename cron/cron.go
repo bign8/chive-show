@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -54,6 +55,15 @@ func Init(store *datastore.Client) {
 	http.Handle("/cron/parse", parse(store, tasker))
 	http.Handle("/cron/batch", batch(store))
 	http.Handle("/cron/delete", delete(store))
+	http.HandleFunc("/cron/debug", debug)
+}
+
+func debug(w http.ResponseWriter, r *http.Request) {
+	bits, err := httputil.DumpRequest(r, true)
+	if err != nil {
+		panic(err)
+	}
+	w.Write(bits)
 }
 
 var (

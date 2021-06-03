@@ -118,8 +118,14 @@ func AddKeys(c context.Context, store *datastore.Client, name string, keys []*da
 	// return err2
 }
 
+type DatastoreClient interface {
+	Get(context.Context, *datastore.Key, interface{}) error
+	GetAll(context.Context, *datastore.Query, interface{}) ([]*datastore.Key, error)
+	Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error)
+}
+
 // GetKeys returns the keys for a particular item
-func GetKeys(c context.Context, store *datastore.Client, name string) ([]*datastore.Key, error) {
+func GetKeys(c context.Context, store DatastoreClient, name string) ([]*datastore.Key, error) {
 	var container entityKeys
 
 	// // Check Memcache

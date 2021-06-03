@@ -31,16 +31,16 @@ func TestCountQuery(t *testing.T) {
 	}
 }
 
-type testLister func(int) ([]models.Post, error)
+type testLister func(*models.RandomOptions) (*models.RandomResult, error)
 
-func (list testLister) ListPosts(ctx context.Context, count int) ([]models.Post, error) {
-	return list(count)
+func (list testLister) Random(ctx context.Context, opts *models.RandomOptions) (*models.RandomResult, error) {
+	return list(opts)
 }
 
 func TestRandomFail(t *testing.T) {
 	r := httptest.NewRequest("GET", "/random", nil)
 	w := httptest.NewRecorder()
-	s := func(count int) ([]models.Post, error) {
+	s := func(opts *models.RandomOptions) (*models.RandomResult, error) {
 		return nil, errors.New("fail")
 	}
 	random(testLister(s)).ServeHTTP(w, r)
@@ -49,8 +49,10 @@ func TestRandomFail(t *testing.T) {
 func TestRandomPass(t *testing.T) {
 	r := httptest.NewRequest("GET", "/random", nil)
 	w := httptest.NewRecorder()
-	s := func(count int) ([]models.Post, error) {
-		return make([]models.Post, count), nil
+	s := func(opts *models.RandomOptions) (*models.RandomResult, error) {
+		return &models.RandomResult{
+			Posts: make([]models.Post, opts.Count),
+		}, nil
 	}
 	random(testLister(s)).ServeHTTP(w, r)
 }
