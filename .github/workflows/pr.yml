@@ -22,11 +22,13 @@ jobs:
           RES=`gcloud app browse --project=$PROJECT --version=pr-$VERSION 2>&1 | tail -n 1`
           echo "::set-output name=url::$RES"
 
+      # Run an integration suite against the deployed service
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
           go-version: 1.16
-
+      - name: Get dependencies
+        run: go mod download
       - name: Integration
         env:
           ADDRESS: ${{ steps.deploy.outputs.url }}
