@@ -57,7 +57,10 @@ func random(store models.Store) http.HandlerFunc {
 		if host := r.Header.Get("x-forwarded-host"); host != "" {
 			r.URL.Host = host // work around test environment shortcomings
 		}
-		r.URL.Scheme = r.Header.Get("x-forwarded-proto")
+		r.URL.Scheme = "http"
+		if scheme := r.Header.Get("x-forwarded-proto"); scheme != "" {
+			r.URL.Scheme = scheme
+		}
 
 		// Successful response!
 		enc.Encode(response{
