@@ -28,10 +28,22 @@ function timeSince(date) {
 }
 
 function create_media(media) {
-    let img = document.createElement('img')
-    img.src = media.url
-    img.title = media.title
-    img.alt = media.title
+    var img;
+    if (media.url.endsWith(".mp4")) {
+        let src = document.createElement('source')
+        src.type = 'video/mp4'
+        src.src = media.url
+        img = document.createElement('video')
+        img.loop = true
+        img.playsInline = true
+        img.append(src)
+        videos.observe(img) // have the scroll observer play if in viewport
+    } else {
+        img = document.createElement('img')
+        img.src = media.url
+        img.title = media.title
+        img.alt = media.title
+    }
 
     // dumb huristic to determin if the title is human readable
     if (img.title.indexOf(' ') > 0) {
@@ -130,18 +142,28 @@ function pump() {
         return res.data
     }).then(posts => {
         for (let post of posts) scroller.append(create_post(post))
-        observer.observe(scroller.lastChild.previousSibling)
+        bottom.observe(scroller.lastChild.previousSibling)
     })
 }
 
 // https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API
-let observer = new IntersectionObserver((entries, observer) => {
+let bottom = new IntersectionObserver((entries, observer) => {
     entries.forEach(entry => {
         if (entry.isIntersecting) {
             observer.unobserve(entry.target)
             pump()
         }
-        console.log(entry)
+    })
+})
+let videos = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting && entry.target.paused) {
+            console.log('about to play video', entry)
+            entry.target.play()
+        } else if (!entry.target.paused) {
+            console.log('about to pause video', entry)
+            entry.target.pause()
+        }
     })
 })
 
