@@ -11,7 +11,6 @@ import (
 	"cloud.google.com/go/datastore"
 
 	"github.com/bign8/chive-show/appengine"
-	"github.com/bign8/chive-show/models/datastore/keycache"
 	"github.com/bign8/chive-show/models"
 )
 
@@ -22,24 +21,28 @@ func NewStore() (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Store{store: store}, nil
+	return &Store{
+		store:   store,
+		getKeys: getKeys,
+	}, nil
 }
 
 type Store struct {
-	store storeDatastoreClient
-	stash map[int64]bool
+	store   datastoreClient
+	stash   map[int64]bool
+	getKeys func(c context.Context, store datastoreClient, name string) ([]*datastore.Key, error) // for testing
 }
 
-type storeDatastoreClient interface {
-	keycache.DatastoreClient
+// allow faking out of the datastore for unit tests
+type datastoreClient interface {
+	Get(context.Context, *datastore.Key, interface{}) error
+	GetAll(context.Context, *datastore.Query, interface{}) ([]*datastore.Key, error)
+	Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error)
 	GetMulti(context.Context, []*datastore.Key, interface{}) error
 	PutMulti(context.Context, []*datastore.Key, interface{}) ([]*datastore.Key, error)
 }
 
-var (
-	_       models.Store = (*Store)(nil)
-	getKeys              = keycache.GetKeys
-)
+var _ models.Store = (*Store)(nil)
 
 func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models.RandomResult, error) {
 	if opts == nil {
@@ -72,9 +75,9 @@ func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models
 	}
 
 	// Pull keys from post keys object
-	keys, err := getKeys(ctx, s.store, models.POST)
+	keys, err := s.getKeys(ctx, s.store, models.POST)
 	if err != nil {
-		log.Printf("ERR: keycache.GetKeys %v", err)
+		log.Printf("ERR: getKeys %v", err)
 		return nil, err
 	}
 	if len(keys) < opts.Count || len(keys) < offset {
@@ -144,7 +147,7 @@ func (s *Store) Has(ctx context.Context, post models.Post) (bool, error) {
 	if s.stash != nil {
 		return s.stash[post.ID], nil
 	}
-	keys, err := getKeys(ctx, s.store, models.POST)
+	keys, err := s.getKeys(ctx, s.store, models.POST)
 	if err != nil {
 		return false, err
 	}
@@ -169,5 +172,5 @@ func (s *Store) PutMulti(ctx context.Context, posts []models.Post) error {
 			s.stash[post.ID] = true
 		}
 	}
-	return keycache.AddKeys(ctx, s.store, models.POST, complete)
+	return addKeys(ctx, s.store, models.POST, complete)
 }

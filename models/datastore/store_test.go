@@ -7,21 +7,20 @@ import (
 
 	"cloud.google.com/go/datastore"
 
-	"github.com/bign8/chive-show/models/datastore/keycache"
 	"github.com/bign8/chive-show/models"
 )
 
 func TestRandom(t *testing.T) {
-	getKeys = func(c context.Context, store keycache.DatastoreClient, name string) ([]*datastore.Key, error) {
-		return []*datastore.Key{
-			datastore.IDKey(models.POST, 1, nil),
-			datastore.IDKey(models.POST, 2, nil),
-			datastore.IDKey(models.POST, 3, nil),
-			datastore.IDKey(models.POST, 4, nil),
-			datastore.IDKey(models.POST, 5, nil),
-		}, nil
-	}
 	s := &Store{
+		getKeys: func(c context.Context, store datastoreClient, name string) ([]*datastore.Key, error) {
+			return []*datastore.Key{
+				datastore.IDKey(models.POST, 1, nil),
+				datastore.IDKey(models.POST, 2, nil),
+				datastore.IDKey(models.POST, 3, nil),
+				datastore.IDKey(models.POST, 4, nil),
+				datastore.IDKey(models.POST, 5, nil),
+			}, nil
+		},
 		store: &fake{
 			getMulti: func(keys []*datastore.Key, obj interface{}) error {
 				if len(keys) != 3 {
