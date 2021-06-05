@@ -89,8 +89,7 @@ type feedParser struct {
 	store   *datastore.Store
 	tasker  *cloudtasks.Client
 
-	todo []int
-	// guids map[int64]bool // this could be extremely large
+	todo  []int
 	posts []models.Post
 }
 
@@ -98,24 +97,6 @@ func (x *feedParser) Main(c context.Context, store *datastore.Store, tasker *clo
 	x.context = c
 	x.store = store
 	x.tasker = tasker
-
-	// // Load guids from DB
-	// // TODO: do this with sharded keys
-	// keys, err := store.GetAll(c, datastore.NewQuery(models.POST).KeysOnly(), nil)
-	// if err != nil {
-	// 	log.Printf("Error: finding keys %v", err)
-	// 	return err
-	// }
-	// x.guids = map[int64]bool{}
-	// for _, key := range keys {
-	// 	x.guids[key.ID] = true
-	// }
-	// keys = nil
-
-	// // DEBUG ONLY
-	// data, err := json.MarshalIndent(x.guids, "", "  ")
-	// fmt.Fprint(w, string(data))
-	// return err
 	x.posts = make([]models.Post, 0)
 
 	// Initial recursive edge case
