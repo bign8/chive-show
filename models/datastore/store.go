@@ -21,11 +21,13 @@ func NewStore(store *datastore.Client) (*Store, error) {
 
 type Store struct {
 	store storeDatastoreClient
+	stash map[int64]bool
 }
 
 type storeDatastoreClient interface {
 	keycache.DatastoreClient
 	GetMulti(context.Context, []*datastore.Key, interface{}) error
+	PutMulti(context.Context, []*datastore.Key, interface{}) ([]*datastore.Key, error)
 }
 
 var (
@@ -130,4 +132,31 @@ func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models
 		Next:  next,
 		Prev:  prev,
 	}, nil
+}
+
+func (s *Store) Has(ctx context.Context, post models.Post) (bool, error) {
+	if s.stash != nil {
+		return s.stash[post.ID], nil
+	}
+	keys, err := getKeys(ctx, s.store, models.POST)
+	if err != nil {
+		return false, err
+	}
+	s.stash = make(map[int64]bool, len(keys))
+	for _, key := range keys {
+		s.stash[key.ID] = true
+	}
+	return s.stash[post.ID], nil
+}
+
+func (s *Store) PutMulti(ctx context.Context, posts []models.Post) error {
+	keys := make([]*datastore.Key, len(posts))
+	for i, post := range posts {
+		keys[i] = datastore.IDKey(models.POST, post.ID, nil)
+	}
+	complete, err := s.store.PutMulti(ctx, keys, posts)
+	if err != nil {
+		return err
+	}
+	return keycache.AddKeys(ctx, s.store, models.POST, complete)
 }

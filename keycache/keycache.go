@@ -78,7 +78,7 @@ func (x *entityKey) toKey(c context.Context, kind string) *datastore.Key {
 }
 
 // AddKeys add keys to the context
-func AddKeys(c context.Context, store *datastore.Client, name string, keys []*datastore.Key) error {
+func AddKeys(c context.Context, store DatastoreClient, name string, keys []*datastore.Key) error {
 	var container entityKeys
 	ds := datastoreKey(name)
 	// mc := memcacheKey(name)

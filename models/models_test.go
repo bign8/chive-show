@@ -17,7 +17,7 @@ func TestLoad(t *testing.T) {
 
 func TestSave(t *testing.T) {
 	x := &Post{
-		Media: []Img{{
+		Media: []Media{{
 			Title: "hello",
 		}},
 	}

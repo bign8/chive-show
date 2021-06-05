@@ -10,8 +10,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"regexp"
-	"strconv"
 	"strings"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
@@ -56,6 +54,7 @@ func Init(store *datastore.Client) {
 	http.Handle("/cron/batch", batch(store))
 	http.Handle("/cron/delete", delete(store))
 	http.HandleFunc("/cron/debug", debug)
+	http.HandleFunc("/cron/test", test(store))
 }
 
 func debug(w http.ResponseWriter, r *http.Request) {
@@ -329,8 +328,7 @@ func (x *feedParser) isStop(idx int) (isStop, fullStop bool, err error) {
 	// Check for Duplicates
 	count := 0
 	for _, post := range posts {
-		id, _, err := guidToInt(post.GUID)
-		if x.guids[id] || err != nil {
+		if x.guids[post.ID] {
 			continue
 		}
 		count++
@@ -345,6 +343,22 @@ func (x *feedParser) isStop(idx int) (isStop, fullStop bool, err error) {
 		fullStop = idx == DEPTH
 	}
 	return
+}
+
+func test(store *datastore.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		x := &feedParser{
+			context: r.Context(),
+		}
+		posts, err := x.getAndParseFeed(1)
+		if err != nil {
+			panic(err)
+		}
+		enc := json.NewEncoder(w)
+		enc.SetIndent(``, ` `)
+		enc.SetEscapeHTML(false)
+		enc.Encode(posts)
+	}
 }
 
 func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
@@ -373,15 +387,26 @@ func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 	var feed struct {
 		Items []models.Post `xml:"channel>item"`
 	}
-	if decoder.Decode(&feed) != nil {
+	if err := decoder.Decode(&feed); err != nil {
 		return nil, err
 	}
 
+	// Remove any dopamine dump posts (they link out to i.thechive.com and host external user content)
+	for i := len(feed.Items) - 1; i >= 0; i-- {
+		if feed.Items[i].Link == "http://i.thechive.com/dopamine-dump" {
+			// https://i.thechive.com/rest/uploads?queryType=dopamine-dump&offset=0
+			log.Printf("INFO: Ignoring dopamine dump (TODO: separate miner for i.thechive.com/rest/uploads): %s", feed.Items[i].Link)
+			feed.Items = append(feed.Items[:i], feed.Items[i+1:]...)
+		}
+	}
+
 	// Cleanup Response
+	// TODO: mine pages in parallel (worker pool?)
 	for idx := range feed.Items {
 		post := &feed.Items[idx]
 		if err = mine(post); err != nil {
 			log.Printf("Unable to mine page for details: %s", post.Link)
+			return nil, err
 		}
 		for i, img := range post.Media {
 			post.Media[i].URL = stripQuery(img.URL)
@@ -403,7 +428,7 @@ func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 			post.Media = post.Media[1:]
 		}
 	}
-	return feed.Items, err
+	return feed.Items, nil
 }
 
 func mine(post *models.Post) error {
@@ -414,13 +439,20 @@ func mine(post *models.Post) error {
 	}
 	doc := soup.HTMLParse(res)
 
-	for _, figure := range doc.FindAll("figure") {
-		obj := figure.Find("img")
-		if obj.Error != nil {
-			log.Printf("Unable to find img: %s: %v", post.Link, obj.Error)
-			continue
-		}
-		post.Media = append(post.Media, models.Img{
+	// Pages embed single banner image
+	figure := doc.Find("figure")
+	if figure.Error != nil {
+		log.Printf("WARNING: unable to load figure %s: %v", post.Link, figure.Error)
+		return nil
+	}
+	obj := figure.Find("img")
+	if obj.Error != nil {
+		obj = figure.Find("source")
+	}
+	if obj.Error != nil {
+		log.Printf("WARNING: uanble to load banner content %s: %v", post.Link, obj.Error)
+	} else {
+		post.Media = append(post.Media, models.Media{
 			URL: obj.Attrs()["src"],
 		})
 	}
@@ -429,7 +461,7 @@ func mine(post *models.Post) error {
 	// TODO: use match the image prefix? "https:\/\/thechive.com\/wp-content\/uploads\/" in the HTML and parse to closing "
 	js := doc.Find("script", "id", "chive-theme-js-js-extra")
 	if js.Error != nil {
-		log.Printf("Unable to find script logic: %v %v", post.GUID, js.Error)
+		log.Printf("WARNING: Unable to find script logic in %q %v", post.Link, js.Error)
 		return nil
 	}
 	src := js.FullText()
@@ -445,7 +477,8 @@ func mine(post *models.Post) error {
 	src = src[:idx+1]
 	var what struct {
 		Items []struct {
-			HTML *string `json:"html,omitempty"`
+			HTML string `json:"html"`
+			Type string `json:"type"`
 		} `json:"items"`
 	}
 	err = json.Unmarshal([]byte(src), &what)
@@ -455,22 +488,32 @@ func mine(post *models.Post) error {
 
 	// Parse HTML attributes of JSON to get images
 	for i, obj := range what.Items {
-		if obj.HTML == nil {
-			log.Printf("no HTML found in fragment %d (embedded in post?)", i)
+		if obj.HTML == "" {
+			// first entry allways appears to be empty as the first post is embedded in page content
+			// that said, this warning is here in case something changes in the future
+			if i != 0 {
+				log.Printf("WARNING: got nil HTML in item %d on %s", i, post.Link)
+			}
 			continue
 		}
-		ele := soup.HTMLParse(*obj.HTML)
+		ele := soup.HTMLParse(obj.HTML)
 		if ele.Error != nil {
-			log.Printf("unable to parse post fragment %d", i)
+			log.Printf("WARNING: unable to parse HTML of %d on %s", i, post.Link)
 			continue
 		}
-		imgs := ele.FindAll("img")
+		var imgs []soup.Root
+		switch obj.Type {
+		case "gif":
+			imgs = ele.FindAll("source")
+		default:
+			imgs = ele.FindAll("img")
+		}
 		if len(imgs) == 0 {
-			log.Printf("no images found in fragment %d (video?)", i)
+			log.Printf("WARNING: No media found in item %d on %s", i, post.Link)
 			continue
 		}
 		for _, img := range imgs {
-			post.Media = append(post.Media, models.Img{
+			post.Media = append(post.Media, models.Media{
 				URL: img.Attrs()["src"],
 			})
 		}
@@ -482,13 +525,8 @@ func (x *feedParser) storePosts(dirty []models.Post) error {
 	var posts []models.Post
 	var keys []*datastore.Key
 	for _, post := range dirty {
-		key, err := x.cleanPost(&post)
-		if err != nil {
-			log.Printf("Unable to clean post: %v %v", post.GUID, err)
-			continue
-		}
 		posts = append(posts, post)
-		keys = append(keys, key)
+		keys = append(keys, datastore.IDKey(models.POST, post.ID, nil))
 	}
 	if len(keys) == 0 {
 		return nil
@@ -499,50 +537,6 @@ func (x *feedParser) storePosts(dirty []models.Post) error {
 		return err
 	}
 	return keycache.AddKeys(x.context, x.store, models.POST, complete)
-}
-
-func (x *feedParser) cleanPost(p *models.Post) (*datastore.Key, error) {
-	id, link, err := guidToInt(p.GUID)
-	if err != nil {
-		return nil, err
-	}
-	// Remove link posts
-	if link {
-		log.Printf("INFO: Ignoring links post %v \"%v\"", p.GUID, p.Title)
-		return nil, fmt.Errorf("ignoring links post")
-	}
-
-	// Detect video only posts
-	video := regexp.MustCompile(`\([^&]*Video.*\)`)
-	if video.MatchString(p.Title) {
-		log.Printf("INFO: Ignoring video post %v \"%v\"", p.GUID, p.Title)
-		return nil, fmt.Errorf("ignoring video post")
-	}
-	log.Printf("INFO: Storing post %v \"%v\"", p.GUID, p.Title)
-
-	// Cleanup post titles
-	clean := regexp.MustCompile(`\W\(([^\)]*)\)$`)
-	p.Title = clean.ReplaceAllLiteralString(p.Title, "")
-
-	// Post
-	// temp_key := datastore.NewIncompleteKey(x.context, DB_POST_TABLE, nil)
-	key := datastore.IDKey(models.POST, id, nil)
-	return key, nil
-}
-
-func guidToInt(guid string) (int64, bool, error) {
-	// Remove link posts
-	url, err := url.Parse(guid)
-	if err != nil {
-		return -1, false, err
-	}
-
-	// Parsing post id from guid url
-	id, err := strconv.Atoi(url.Query().Get("p"))
-	if err != nil {
-		return -1, false, err
-	}
-	return int64(id), url.Query().Get("post_type") == "sdac_links", nil
 }
 
 func stripQuery(dirty string) string {

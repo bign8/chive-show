@@ -3,7 +3,10 @@ package models
 import (
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
+	"regexp"
+	"time"
 
 	"cloud.google.com/go/datastore"
 )
@@ -12,50 +15,78 @@ import (
 const POST = "Post"
 
 // Img the model for a post in an image
-type Img struct {
-	URL      string `datastore:"url"      json:"url"   xml:"url,attr"`
-	Title    string `datastore:"title"    json:"title" xml:"title"`
-	Rating   string `datastore:"rating"   json:"-"     xml:"rating"`
-	Category string `datastore:"-"        json:"-"     xml:"category"`
-
-	// TODO: Implement these!
-	IsValid bool `datastore:"is_valid" json:"-"     xml:"-"`
+type Media struct {
+	URL      string `datastore:"url" json:"url" xml:"url,attr"`
+	Title    string `datastore:"title" json:"title,omitempty" xml:"-"` // the xml titles are worthless (especially now that the full content isn't present)
+	Rating   string `datastore:"-" json:"-" xml:"rating"`
+	Category string `datastore:"-" json:"-" xml:"category"`
+	// Type     string `datastore:"type" json:"type" xml:"-"` // loaded when scraping content: attachment (for images), gif (for videos)
 }
 
 // Post data object
 type Post struct {
-	// Attributes used for generating unique leu
-	GUID string `datastore:"-"       json:"-"       xml:"guid"`
-
-	// Direct atributes
-	Tags    []string `datastore:"tags"    json:"tags"    xml:"category"`
-	Link    string   `datastore:"link"    json:"link"    xml:"link"`
-	Date    string   `datastore:"date"    json:"date"    xml:"pubDate"`
-	Title   string   `datastore:"title"   json:"title"   xml:"title"`
-	Creator string   `datastore:"creator" json:"creator" xml:"creator"`
+	ID      int64     `datastore:"-" json:"id,omitempty"`
+	Tags    []string  `datastore:"tags" json:"tags"`
+	Link    string    `datastore:"link" json:"link"`
+	Date    time.Time `datastore:"date" json:"date"`
+	Title   string    `datastore:"title" json:"title"`
+	Creator string    `datastore:"creator" json:"creator"`
+	MugShot string    `datastore:"mugshot,noindex" json:"mugshot"`
 
 	// Attributes tweaked to minimize transactions (LoadSaver stuff)
-	MediaBytes []byte `datastore:"media,noindex"   json:"-"       xml:"-"`
-	Media      []Img  `datastore:"-"               json:"media"   xml:"content"`
-
-	// Manually built attributes from post
-	MugShot string `datastore:"mugshot" json:"mugshot" xml:"-"`
+	MediaBytes []byte  `datastore:"media,noindex" json:"-"`
+	Media      []Media `datastore:"-" json:"media"`
 }
 
-// Load Datastore LoadSaveProperty Interface
+// LoadKey Datastore KeyLoader Interface: https://pkg.go.dev/cloud.google.com/go/datastore#KeyLoader
+func (x *Post) LoadKey(k *datastore.Key) error {
+	x.ID = k.ID
+	return nil
+}
+
+// Load Datastore PropertyLoadSaver Interface : https://pkg.go.dev/cloud.google.com/go/datastore#PropertyLoadSaver
 func (x *Post) Load(c []datastore.Property) error {
-	if err := datastore.LoadStruct(x, c); err != nil {
+	err := datastore.LoadStruct(x, c)
+	if err != nil {
 		return err
 	}
 	return json.Unmarshal(x.MediaBytes, &x.Media)
 }
 
-// Save Datastore LoadSaveProperty Interface
+// Save Datastore PropertyLoadSaver Interface : https://pkg.go.dev/cloud.google.com/go/datastore#PropertyLoadSaver
 func (x *Post) Save() (props []datastore.Property, err error) {
 	if x.MediaBytes, err = json.Marshal(&x.Media); err != nil {
 		return nil, err
 	}
 	return datastore.SaveStruct(x)
+}
+
+var clean = regexp.MustCompile(`\W\(([^\)]*)\)$`)
+
+// UnmarshalXML implements xml.Unmarshaler for custom unmarshaling logic : https://golang.org/pkg/encoding/xml/#Unmarshaler
+func (x *Post) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
+	var post struct {
+		ID      int64    `xml:"post-id"`
+		Tags    []string `xml:"category"`
+		Link    string   `xml:"link"`
+		Date    string   `xml:"pubDate"`
+		Title   string   `xml:"title"`
+		Creator string   `xml:"creator"`
+		Media   []Media  `xml:"content"`
+	}
+	if err = d.DecodeElement(&post, &start); err != nil {
+		return err
+	}
+	x.ID = post.ID
+	x.Tags = post.Tags
+	x.Link = post.Link
+	x.Title = clean.ReplaceAllLiteralString(post.Title, "")
+	x.Creator = post.Creator
+	x.Media = post.Media // TODO: do mugshot scrubbing here
+	if x.Date, err = time.Parse(time.RFC1123Z, post.Date); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Storage based errors
@@ -68,9 +99,9 @@ var (
 type Store interface {
 	Random(ctx context.Context, opts *RandomOptions) (*RandomResult, error)
 	// List(ctx context.Context, opts *ListOptions) ([]Post, error)
-	// Save(ctx context.Context, post Post) error
-	// Create(ctx context.Context, posts []Post) error
 	// Delete(ctx context.Context, ids []int) error
+	PutMulti(ctx context.Context, posts []Post) error
+	Has(ctx context.Context, post Post) (bool, error)
 }
 
 type RandomOptions struct {

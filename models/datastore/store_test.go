@@ -29,7 +29,7 @@ func TestRandom(t *testing.T) {
 				}
 				list := obj.([]models.Post)
 				for i, post := range list {
-					post.GUID = "todo"
+					post.ID = int64(i)
 					list[i] = post
 				}
 				return nil
@@ -60,6 +60,9 @@ func (f *fake) GetAll(context.Context, *datastore.Query, interface{}) ([]*datast
 	return nil, errors.New("TODO")
 }
 func (f *fake) Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error) {
+	return nil, errors.New("TODO")
+}
+func (f *fake) PutMulti(context.Context, []*datastore.Key, interface{}) ([]*datastore.Key, error) {
 	return nil, errors.New("TODO")
 }
 func (f *fake) GetMulti(_ context.Context, keys []*datastore.Key, obj interface{}) error {
