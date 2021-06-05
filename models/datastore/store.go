@@ -2,7 +2,6 @@ package datastore
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -150,10 +149,22 @@ func (s *Store) Random(rctx context.Context, opts *models.ListOptions) (*models.
 }
 
 func (s *Store) List(rctx context.Context, opts *models.ListOptions) (*models.ListResult, error) {
-	_, span := trace.StartSpan(rctx, "store.Random")
+	ctx, span := trace.StartSpan(rctx, "store.Random")
 	defer span.End()
 
-	return nil, errors.New("TODO")
+	q := datastore.NewQuery(models.POST).Limit(opts.Count).Order("-date")
+	if opts.Tag != "" {
+		q = q.Filter("tags =", opts.Tag)
+	}
+
+	var posts []models.Post
+	_, err := s.store.GetAll(ctx, q, &posts)
+	if err != nil {
+		return nil, err
+	}
+	return &models.ListResult{
+		Posts: posts,
+	}, nil
 }
 
 // SELECT * FROM `Post` WHERE "Humor" in tags ORDER BY date DESC

@@ -41,9 +41,9 @@ func handle(fn func(context.Context, *models.ListOptions) (*models.ListResult, e
 
 		// Fire the real request
 		opts := &models.ListOptions{
-			Count:    count,
-			Cursor:   r.URL.Query().Get("cursor"),
-			Category: r.URL.Query().Get("category"),
+			Count:  count,
+			Cursor: r.URL.Query().Get("cursor"),
+			Tag:    r.URL.Query().Get("tag"),
 		}
 		res, err := fn(r.Context(), opts)
 		if err != nil {
@@ -123,8 +123,8 @@ func toLink(parent *url.URL, opts *models.ListOptions) string {
 		"count":  {strconv.Itoa(opts.Count)},
 		"cursor": {opts.Cursor},
 	}
-	if opts.Category != "" {
-		vals.Add("category", opts.Category)
+	if opts.Tag != "" {
+		vals.Add("tag", opts.Tag)
 	}
 	return parent.ResolveReference(&url.URL{RawQuery: vals.Encode()}).String()
 }

@@ -106,9 +106,9 @@ type Store interface {
 }
 
 type ListOptions struct {
-	Count    int
-	Cursor   string
-	Category string
+	Count  int
+	Cursor string
+	Tag    string
 }
 
 type ListResult struct {

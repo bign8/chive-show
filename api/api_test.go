@@ -49,8 +49,8 @@ func TestHandlePass(t *testing.T) {
 		return &models.ListResult{
 			Posts: make([]models.Post, opts.Count),
 			Next: &models.ListOptions{
-				Cursor:   "curses",
-				Category: "mixed",
+				Cursor: "curses",
+				Tag:    "mixed",
 			},
 		}, nil
 	}
