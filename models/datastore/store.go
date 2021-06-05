@@ -10,12 +10,18 @@ import (
 
 	"cloud.google.com/go/datastore"
 
-	"github.com/bign8/chive-show/keycache"
+	"github.com/bign8/chive-show/appengine"
+	"github.com/bign8/chive-show/models/datastore/keycache"
 	"github.com/bign8/chive-show/models"
 )
 
-func NewStore(store *datastore.Client) (*Store, error) {
-	// TODO: move datastore.Client here once CRON is consuming this
+func NewStore() (*Store, error) {
+	// https://cloud.google.com/docs/authentication/production
+	// GOOGLE_APPLICATION_CREDENTIALS=<path-to>/service-account.json
+	store, err := datastore.NewClient(context.Background(), appengine.AppID(context.TODO()))
+	if err != nil {
+		return nil, err
+	}
 	return &Store{store: store}, nil
 }
 
@@ -157,6 +163,11 @@ func (s *Store) PutMulti(ctx context.Context, posts []models.Post) error {
 	complete, err := s.store.PutMulti(ctx, keys, posts)
 	if err != nil {
 		return err
+	}
+	if s.stash != nil {
+		for _, post := range posts {
+			s.stash[post.ID] = true
+		}
 	}
 	return keycache.AddKeys(ctx, s.store, models.POST, complete)
 }

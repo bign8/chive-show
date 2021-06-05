@@ -7,7 +7,7 @@ import (
 
 	"cloud.google.com/go/datastore"
 
-	"github.com/bign8/chive-show/keycache"
+	"github.com/bign8/chive-show/models/datastore/keycache"
 	"github.com/bign8/chive-show/models"
 )
 

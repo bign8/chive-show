@@ -13,14 +13,13 @@ import (
 	"strings"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
-	"cloud.google.com/go/datastore"
 	"contrib.go.opencensus.io/exporter/stackdriver/propagation"
 	"github.com/anaskhan96/soup"
 	"go.opencensus.io/plugin/ochttp"
 	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
 
-	"github.com/bign8/chive-show/keycache"
 	"github.com/bign8/chive-show/models"
+	"github.com/bign8/chive-show/models/datastore"
 )
 
 const (
@@ -45,16 +44,15 @@ var client = &http.Client{
 }
 
 // Init initializes cron handlers
-func Init(store *datastore.Client) {
+func Init(store *datastore.Store) {
 	tasker, err := cloudtasks.NewClient(context.Background())
 	if err != nil {
 		panic(err)
 	}
 	http.Handle("/cron/parse", parse(store, tasker))
 	http.Handle("/cron/batch", batch(store))
-	http.Handle("/cron/delete", delete(store))
 	http.HandleFunc("/cron/debug", debug)
-	http.HandleFunc("/cron/test", test(store))
+	http.HandleFunc("/cron/test", test)
 }
 
 func debug(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +72,7 @@ func pageURL(idx int) string {
 	return fmt.Sprintf("http://thechive.com/feed/?paged=%d", idx)
 }
 
-func parse(store *datastore.Client, tasker *cloudtasks.Client) http.HandlerFunc {
+func parse(store *datastore.Store, tasker *cloudtasks.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fp := new(feedParser)
 		err := fp.Main(r.Context(), store, tasker, w)
@@ -88,31 +86,31 @@ func parse(store *datastore.Client, tasker *cloudtasks.Client) http.HandlerFunc 
 
 type feedParser struct {
 	context context.Context
-	store   *datastore.Client
+	store   *datastore.Store
 	tasker  *cloudtasks.Client
 
-	todo  []int
-	guids map[int64]bool // this could be extremely large
+	todo []int
+	// guids map[int64]bool // this could be extremely large
 	posts []models.Post
 }
 
-func (x *feedParser) Main(c context.Context, store *datastore.Client, tasker *cloudtasks.Client, w http.ResponseWriter) error {
+func (x *feedParser) Main(c context.Context, store *datastore.Store, tasker *cloudtasks.Client, w http.ResponseWriter) error {
 	x.context = c
 	x.store = store
 	x.tasker = tasker
 
-	// Load guids from DB
-	// TODO: do this with sharded keys
-	keys, err := store.GetAll(c, datastore.NewQuery(models.POST).KeysOnly(), nil)
-	if err != nil {
-		log.Printf("Error: finding keys %v", err)
-		return err
-	}
-	x.guids = map[int64]bool{}
-	for _, key := range keys {
-		x.guids[key.ID] = true
-	}
-	keys = nil
+	// // Load guids from DB
+	// // TODO: do this with sharded keys
+	// keys, err := store.GetAll(c, datastore.NewQuery(models.POST).KeysOnly(), nil)
+	// if err != nil {
+	// 	log.Printf("Error: finding keys %v", err)
+	// 	return err
+	// }
+	// x.guids = map[int64]bool{}
+	// for _, key := range keys {
+	// 	x.guids[key.ID] = true
+	// }
+	// keys = nil
 
 	// // DEBUG ONLY
 	// data, err := json.MarshalIndent(x.guids, "", "  ")
@@ -125,7 +123,7 @@ func (x *feedParser) Main(c context.Context, store *datastore.Client, tasker *cl
 	if isStop || fullStop || err != nil {
 		log.Printf("INFO: Finished without recursive searching %v", err)
 		if err == nil {
-			err = x.storePosts(x.posts)
+			err = x.store.PutMulti(x.context, x.posts)
 		}
 		return err
 	}
@@ -137,7 +135,7 @@ func (x *feedParser) Main(c context.Context, store *datastore.Client, tasker *cl
 	if err == nil {
 		errc := make(chan error)
 		go func() {
-			errc <- x.storePosts(x.posts)
+			errc <- x.store.PutMulti(x.context, x.posts)
 		}()
 		go func() {
 			errc <- x.processTodo()
@@ -156,7 +154,7 @@ func (x *feedParser) Main(c context.Context, store *datastore.Client, tasker *cl
 	return err
 }
 
-func batch(store *datastore.Client) http.HandlerFunc {
+func batch(store *datastore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// TODO: ensure this task is coming from appengine
 		if r.Method != http.MethodPost {
@@ -210,7 +208,7 @@ func (x *feedParser) processBatch(ids []int) error {
 		go func(idx int) {
 			posts, err := x.getAndParseFeed(idx)
 			if err == nil {
-				err = x.storePosts(posts)
+				err = x.store.PutMulti(x.context, posts)
 			}
 			done <- err
 		}(idx)
@@ -328,7 +326,8 @@ func (x *feedParser) isStop(idx int) (isStop, fullStop bool, err error) {
 	// Check for Duplicates
 	count := 0
 	for _, post := range posts {
-		if x.guids[post.ID] {
+		if has, err := x.store.Has(x.context, post); has || err != nil {
+			log.Printf("Found duplicate: %s %v", post.Link, err)
 			continue
 		}
 		count++
@@ -345,20 +344,18 @@ func (x *feedParser) isStop(idx int) (isStop, fullStop bool, err error) {
 	return
 }
 
-func test(store *datastore.Client) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		x := &feedParser{
-			context: r.Context(),
-		}
-		posts, err := x.getAndParseFeed(1)
-		if err != nil {
-			panic(err)
-		}
-		enc := json.NewEncoder(w)
-		enc.SetIndent(``, ` `)
-		enc.SetEscapeHTML(false)
-		enc.Encode(posts)
+func test(w http.ResponseWriter, r *http.Request) {
+	x := &feedParser{
+		context: r.Context(),
 	}
+	posts, err := x.getAndParseFeed(1)
+	if err != nil {
+		panic(err)
+	}
+	enc := json.NewEncoder(w)
+	enc.SetIndent(``, ` `)
+	enc.SetEscapeHTML(false)
+	enc.Encode(posts)
 }
 
 func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
@@ -519,24 +516,6 @@ func mine(post *models.Post) error {
 		}
 	}
 	return nil
-}
-
-func (x *feedParser) storePosts(dirty []models.Post) error {
-	var posts []models.Post
-	var keys []*datastore.Key
-	for _, post := range dirty {
-		posts = append(posts, post)
-		keys = append(keys, datastore.IDKey(models.POST, post.ID, nil))
-	}
-	if len(keys) == 0 {
-		return nil
-	}
-	complete, err := x.store.PutMulti(x.context, keys, posts)
-	if err != nil {
-		log.Printf("Problem storing Post: %v %v", keys, err)
-		return err
-	}
-	return keycache.AddKeys(x.context, x.store, models.POST, complete)
 }
 
 func stripQuery(dirty string) string {
