@@ -10,28 +10,39 @@ import (
 
 	"cloud.google.com/go/datastore"
 
-	"github.com/bign8/chive-show/keycache"
+	"github.com/bign8/chive-show/appengine"
 	"github.com/bign8/chive-show/models"
 )
 
-func NewStore(store *datastore.Client) (*Store, error) {
-	// TODO: move datastore.Client here once CRON is consuming this
-	return &Store{store: store}, nil
+func NewStore() (*Store, error) {
+	// https://cloud.google.com/docs/authentication/production
+	// GOOGLE_APPLICATION_CREDENTIALS=<path-to>/service-account.json
+	store, err := datastore.NewClient(context.Background(), appengine.AppID(context.TODO()))
+	if err != nil {
+		return nil, err
+	}
+	return &Store{
+		store:   store,
+		getKeys: getKeys,
+	}, nil
 }
 
 type Store struct {
-	store storeDatastoreClient
+	store   datastoreClient
+	stash   map[int64]bool
+	getKeys func(c context.Context, store datastoreClient, name string) ([]*datastore.Key, error) // for testing
 }
 
-type storeDatastoreClient interface {
-	keycache.DatastoreClient
+// allow faking out of the datastore for unit tests
+type datastoreClient interface {
+	Get(context.Context, *datastore.Key, interface{}) error
+	GetAll(context.Context, *datastore.Query, interface{}) ([]*datastore.Key, error)
+	Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error)
 	GetMulti(context.Context, []*datastore.Key, interface{}) error
+	PutMulti(context.Context, []*datastore.Key, interface{}) ([]*datastore.Key, error)
 }
 
-var (
-	_       models.Store = (*Store)(nil)
-	getKeys              = keycache.GetKeys
-)
+var _ models.Store = (*Store)(nil)
 
 func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models.RandomResult, error) {
 	if opts == nil {
@@ -64,9 +75,9 @@ func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models
 	}
 
 	// Pull keys from post keys object
-	keys, err := getKeys(ctx, s.store, models.POST)
+	keys, err := s.getKeys(ctx, s.store, models.POST)
 	if err != nil {
-		log.Printf("ERR: keycache.GetKeys %v", err)
+		log.Printf("ERR: getKeys %v", err)
 		return nil, err
 	}
 	if len(keys) < opts.Count || len(keys) < offset {
@@ -130,4 +141,36 @@ func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models
 		Next:  next,
 		Prev:  prev,
 	}, nil
+}
+
+func (s *Store) Has(ctx context.Context, post models.Post) (bool, error) {
+	if s.stash != nil {
+		return s.stash[post.ID], nil
+	}
+	keys, err := s.getKeys(ctx, s.store, models.POST)
+	if err != nil {
+		return false, err
+	}
+	s.stash = make(map[int64]bool, len(keys))
+	for _, key := range keys {
+		s.stash[key.ID] = true
+	}
+	return s.stash[post.ID], nil
+}
+
+func (s *Store) PutMulti(ctx context.Context, posts []models.Post) error {
+	keys := make([]*datastore.Key, len(posts))
+	for i, post := range posts {
+		keys[i] = datastore.IDKey(models.POST, post.ID, nil)
+	}
+	complete, err := s.store.PutMulti(ctx, keys, posts)
+	if err != nil {
+		return err
+	}
+	if s.stash != nil {
+		for _, post := range posts {
+			s.stash[post.ID] = true
+		}
+	}
+	return addKeys(ctx, s.store, models.POST, complete)
 }

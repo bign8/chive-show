@@ -1,4 +1,4 @@
-package keycache
+package datastore
 
 // TODO: move this package into models/datastore once cron is updated
 
@@ -14,15 +14,15 @@ import (
 
 const (
 	// KIND is the table cache is stored in
-	KIND = "DatastoreKeysCache"
+	kind = "DatastoreKeysCache"
 )
 
-func memcacheKey(name string) string {
-	return KIND + ":" + name
-}
+// func memcacheKey(name string) string {
+// 	return kind + ":" + name
+// }
 
 func datastoreKey(name string) *datastore.Key {
-	return datastore.NameKey(KIND, name, nil)
+	return datastore.NameKey(kind, name, nil)
 }
 
 // Object: entityKeys
@@ -77,8 +77,8 @@ func (x *entityKey) toKey(c context.Context, kind string) *datastore.Key {
 	return datastore.NameKey(kind, x.StringID, nil)
 }
 
-// AddKeys add keys to the context
-func AddKeys(c context.Context, store *datastore.Client, name string, keys []*datastore.Key) error {
+// addKeys add keys to the context
+func addKeys(c context.Context, store datastoreClient, name string, keys []*datastore.Key) error {
 	var container entityKeys
 	ds := datastoreKey(name)
 	// mc := memcacheKey(name)
@@ -118,14 +118,8 @@ func AddKeys(c context.Context, store *datastore.Client, name string, keys []*da
 	// return err2
 }
 
-type DatastoreClient interface {
-	Get(context.Context, *datastore.Key, interface{}) error
-	GetAll(context.Context, *datastore.Query, interface{}) ([]*datastore.Key, error)
-	Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error)
-}
-
 // GetKeys returns the keys for a particular item
-func GetKeys(c context.Context, store DatastoreClient, name string) ([]*datastore.Key, error) {
+func getKeys(c context.Context, store datastoreClient, name string) ([]*datastore.Key, error) {
 	var container entityKeys
 
 	// // Check Memcache
@@ -153,6 +147,9 @@ func GetKeys(c context.Context, store DatastoreClient, name string) ([]*datastor
 		}
 		container.addKeys(keys)
 		_, err = store.Put(c, key, &container)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// // Fork setting memcache so other things can run
@@ -168,30 +165,30 @@ func GetKeys(c context.Context, store DatastoreClient, name string) ([]*datastor
 	// case <-time.After(3 * time.Millisecond):
 	// }
 	// }
-	return container.toKeys(c, name), err
+	return container.toKeys(c, name), nil
 }
 
-// ResetKeys resets all item keys
-func ResetKeys(c context.Context, store *datastore.Client, name string) error {
-	// errc := make(chan error, 2)
-	// go func() {
-	// 	err := memcache.Delete(c, memcacheKey(name))
-	// 	if err == memcache.ErrCacheMiss {
-	// 		err = nil
-	// 	}
-	// 	errc <- err
-	// }()
-	// go func() {
-	err := store.Delete(c, datastoreKey(name))
-	if err == datastore.ErrNoSuchEntity {
-		err = nil
-	}
-	return err
-	// 	errc <- err
-	// }()
-	// err1, err2 := <-errc, <-errc
-	// if err1 != nil {
-	// 	return err1
-	// }
-	// return err2
-}
+// // resetKeys resets all item keys
+// func resetKeys(c context.Context, store *datastore.Client, name string) error {
+// 	// errc := make(chan error, 2)
+// 	// go func() {
+// 	// 	err := memcache.Delete(c, memcacheKey(name))
+// 	// 	if err == memcache.ErrCacheMiss {
+// 	// 		err = nil
+// 	// 	}
+// 	// 	errc <- err
+// 	// }()
+// 	// go func() {
+// 	err := store.Delete(c, datastoreKey(name))
+// 	if err == datastore.ErrNoSuchEntity {
+// 		err = nil
+// 	}
+// 	return err
+// 	// 	errc <- err
+// 	// }()
+// 	// err1, err2 := <-errc, <-errc
+// 	// if err1 != nil {
+// 	// 	return err1
+// 	// }
+// 	// return err2
+// }

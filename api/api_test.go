@@ -33,6 +33,8 @@ func TestCountQuery(t *testing.T) {
 
 type testLister func(*models.RandomOptions) (*models.RandomResult, error)
 
+func (testLister) Has(context.Context, models.Post) (bool, error) { return false, nil }
+func (testLister) PutMulti(context.Context, []models.Post) error  { return nil }
 func (list testLister) Random(ctx context.Context, opts *models.RandomOptions) (*models.RandomResult, error) {
 	return list(opts)
 }
