@@ -1,145 +1,110 @@
 package datastore
 
-// TODO: move this package into models/datastore once cron is updated
-
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"log"
 	"time"
 
 	"cloud.google.com/go/datastore"
 )
 
-// TODO: have all these APIs NOT require NAME!!! it's literally in the keys :cry:
-
-const (
-	// KIND is the table cache is stored in
-	kind = "DatastoreKeysCache"
-)
-
-// func memcacheKey(name string) string {
-// 	return kind + ":" + name
-// }
-
 func datastoreKey(name string) *datastore.Key {
-	return datastore.NameKey(kind, name, nil)
+	return datastore.NameKey(`DatastoreKeysCache`, name, nil)
 }
 
-// Object: entityKeys
+// entityKeys stores entity keys using a gzip + json format for minimal work and okay compression
+type entityKeys []entityKey
+type entityKey struct {
+	StringID string `json:"str,omitempty"`
+	IntID    int64  `json:"int,omitempty"`
+}
 
-// TODO: use prococal buffers (because why not) and have this be []byte
-// TODO: or use array of strings with GobDecode / GobEncode (since that uses buffers already)
-type entityKeys struct {
-	Keys []entityKey
+// Load Datastore PropertyLoadSaver Interface : https://pkg.go.dev/cloud.google.com/go/datastore#PropertyLoadSaver
+func (keys *entityKeys) Load(c []datastore.Property) error {
+	cmp, err := gzip.NewReader(bytes.NewReader(c[0].Value.([]byte)))
+	if err != nil {
+		return err
+	}
+	if err = json.NewDecoder(cmp).Decode(keys); err != nil {
+		return err
+	}
+	return cmp.Close()
+}
+
+// Save Datastore PropertyLoadSaver Interface : https://pkg.go.dev/cloud.google.com/go/datastore#PropertyLoadSaver
+func (keys entityKeys) Save() (props []datastore.Property, err error) {
+	var buffer bytes.Buffer
+	stream := gzip.NewWriter(&buffer)
+	if err = json.NewEncoder(stream).Encode(&keys); err != nil {
+		return nil, err
+	}
+	if err = stream.Close(); err != nil {
+		return nil, err
+	}
+	return []datastore.Property{{
+		Name:    "data",
+		Value:   buffer.Bytes(),
+		NoIndex: true,
+	}}, nil
 }
 
 func (x *entityKeys) addKeys(keys []*datastore.Key) {
-	if x.Keys == nil {
-		x.Keys = make([]entityKey, 0)
-	}
-
 	duplicate := make(map[entityKey]bool)
-	for _, key := range x.Keys {
+	for _, key := range *x {
 		duplicate[key] = true
 	}
-
 	for _, key := range keys {
 		temp := entityKey{
 			StringID: key.Name,
 			IntID:    key.ID,
 		}
 		if !duplicate[temp] {
-			x.Keys = append(x.Keys, temp)
+			*x = append(*x, temp)
 		}
 	}
 }
 
-func (x *entityKeys) toKeys(c context.Context, name string) []*datastore.Key {
-	keys := make([]*datastore.Key, len(x.Keys))
-	for i, item := range x.Keys {
-		keys[i] = item.toKey(c, name)
+func (x entityKeys) toKeys(name string) []*datastore.Key {
+	keys := make([]*datastore.Key, len(x))
+	for i, item := range x {
+		if item.IntID != 0 {
+			keys[i] = datastore.IDKey(name, item.IntID, nil)
+		} else {
+			keys[i] = datastore.NameKey(name, item.StringID, nil)
+		}
 	}
 	return keys
 }
 
-// Object: entityKey
-
-// TODO: convert to using GobDecode / GobEncode
-type entityKey struct {
-	StringID string
-	IntID    int64
-}
-
-func (x *entityKey) toKey(c context.Context, kind string) *datastore.Key {
-	if x.IntID != 0 {
-		return datastore.IDKey(kind, x.IntID, nil)
-	}
-	return datastore.NameKey(kind, x.StringID, nil)
-}
-
 // addKeys add keys to the context
 func addKeys(c context.Context, store datastoreClient, name string, keys []*datastore.Key) error {
+	start := time.Now()
 	var container entityKeys
 	ds := datastoreKey(name)
-	// mc := memcacheKey(name)
-
-	// // Read
-	// _, err := memcache.Gob.Get(c, mc, &container)
-	// if err != nil {
-	// 	if err != memcache.ErrCacheMiss {
-	// 		return err
-	// 	}
 	err := store.Get(c, ds, &container)
 	if err != nil && err != datastore.ErrNoSuchEntity {
 		return err
 	}
-	// }
-
-	// Update
+	before := len(container)
 	container.addKeys(keys)
-
-	// Write
-	// errc := make(chan error, 2)
-	// go func() {
 	_, err = store.Put(c, ds, &container)
+	log.Printf("DEBU: addKeys took %s seconds to add %d keys", time.Since(start), len(container)-before) // TODO: use tracing spans
 	return err
-	// 	errc <- err
-	// }()
-	// go func() { // TODO: timeout if longer than Put
-	// 	errc <- memcache.Gob.Set(c, &memcache.Item{
-	// 		Key:    mc,
-	// 		Object: container,
-	// 	})
-	// }()
-	// err1, err2 := <-errc, <-errc
-	// if err1 != nil {
-	// 	return err1
-	// }
-	// return err2
 }
 
 // GetKeys returns the keys for a particular item
 func getKeys(c context.Context, store datastoreClient, name string) ([]*datastore.Key, error) {
-	var container entityKeys
-
-	// // Check Memcache
-	// start := time.Now()
-	// _, err := memcache.Gob.Get(c, memcacheKey(name), &container)
-	// log.Printf("INFO: Actual Memcache.Get: %s", time.Since(start))
-	//
-	// if err != nil {
-	// 	if err != memcache.ErrCacheMiss {
-	// 		return nil, err
-	// 	}
-
-	key := datastoreKey(name)
 	start := time.Now()
+	var container entityKeys
+	key := datastoreKey(name)
 	err := store.Get(c, key, &container)
-	log.Printf("INFO: Actual Datastore.Get: %s", time.Since(start))
 
 	// Datastore MISS
 	if err == datastore.ErrNoSuchEntity { // FYI: this is a costly operation
-		log.Printf("INFO: Datastore MISS: Costly Query getting keys over \"%v\"", name)
+		log.Printf("INFO: Datastore MISS: Costly Query getting keys over %q", name)
 		err = nil
 		keys, err := store.GetAll(c, datastore.NewQuery(name).KeysOnly(), nil)
 		if err != nil {
@@ -151,44 +116,16 @@ func getKeys(c context.Context, store datastoreClient, name string) ([]*datastor
 			return nil, err
 		}
 	}
-
-	// // Fork setting memcache so other things can run
-	// done := make(chan error, 1)
-	// go func() {
-	// 	done <- memcache.Gob.Set(c, &memcache.Item{
-	// 		Key:    memcacheKey(name),
-	// 		Object: container,
-	// 	})
-	// }()
-	// select {
-	// case err = <-done:
-	// case <-time.After(3 * time.Millisecond):
-	// }
-	// }
-	return container.toKeys(c, name), nil
+	keys := container.toKeys(name)
+	log.Printf("DEBU: getKeys took %s seconds to get %d keys", time.Since(start), len(keys)) // TODO: use tracing spans
+	return keys, nil
 }
 
 // // resetKeys resets all item keys
 // func resetKeys(c context.Context, store *datastore.Client, name string) error {
-// 	// errc := make(chan error, 2)
-// 	// go func() {
-// 	// 	err := memcache.Delete(c, memcacheKey(name))
-// 	// 	if err == memcache.ErrCacheMiss {
-// 	// 		err = nil
-// 	// 	}
-// 	// 	errc <- err
-// 	// }()
-// 	// go func() {
 // 	err := store.Delete(c, datastoreKey(name))
 // 	if err == datastore.ErrNoSuchEntity {
-// 		err = nil
+// 		return nil
 // 	}
 // 	return err
-// 	// 	errc <- err
-// 	// }()
-// 	// err1, err2 := <-errc, <-errc
-// 	// if err1 != nil {
-// 	// 	return err1
-// 	// }
-// 	// return err2
 // }
