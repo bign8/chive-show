@@ -37,6 +37,7 @@ const (
 	DEFERRED = true
 )
 
+// TODO: use a client that supports gzip request/responses
 var client = &http.Client{
 	Transport: &ochttp.Transport{
 		// Use Google Cloud propagation format.

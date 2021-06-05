@@ -23,6 +23,7 @@ func NewStore() (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	// rebuildTags(store)
 	return &Store{
 		store:   store,
 		getKeys: getKeys,
@@ -42,6 +43,7 @@ type datastoreClient interface {
 	Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error)
 	GetMulti(context.Context, []*datastore.Key, interface{}) error
 	PutMulti(context.Context, []*datastore.Key, interface{}) ([]*datastore.Key, error)
+	NewTransaction(context.Context, ...datastore.TransactionOption) (*datastore.Transaction, error)
 }
 
 var _ models.Store = (*Store)(nil)
@@ -154,10 +156,6 @@ func (s *Store) List(rctx context.Context, opts *models.ListOptions) (*models.Li
 	return nil, errors.New("TODO")
 }
 
-func (s *Store) Tags(rctx context.Context) (map[string]int, error) {
-	return nil, errors.New("TODO")
-}
-
 // SELECT * FROM `Post` WHERE "Humor" in tags ORDER BY date DESC
 
 func (s *Store) Has(rctx context.Context, post models.Post) (bool, error) {
@@ -197,6 +195,9 @@ func (s *Store) PutMulti(rctx context.Context, posts []models.Post) error {
 		for _, post := range posts {
 			s.stash[post.ID] = true
 		}
+	}
+	if err = updateTags(ctx, s.store, posts); err != nil {
+		return err
 	}
 	return addKeys(ctx, s.store, models.POST, complete)
 }

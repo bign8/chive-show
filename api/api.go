@@ -15,6 +15,7 @@ import (
 func Init(store models.Store) {
 	http.Handle("/api/v1/post/random", handle(store.Random))
 	http.Handle("/api/v1/post", handle(store.List))
+	http.Handle("/api/v1/tags", tags(store.Tags))
 }
 
 func getURLCount(url *url.URL) int {
@@ -36,7 +37,7 @@ func handle(fn func(context.Context, *models.ListOptions) (*models.ListResult, e
 
 		// Parse request parameters
 		count := getURLCount(r.URL)
-		log.Printf("INFO: Requested %v random posts", count)
+		log.Printf("INFO: Requested %v posts", count)
 
 		// Fire the real request
 		opts := &models.ListOptions{
@@ -46,7 +47,7 @@ func handle(fn func(context.Context, *models.ListOptions) (*models.ListResult, e
 		}
 		res, err := fn(r.Context(), opts)
 		if err != nil {
-			log.Printf("api(store.Random): %v", err)
+			log.Printf("api(handle): %v", err)
 			enc.Encode(response{
 				Status: "error",
 				Code:   http.StatusInternalServerError,
@@ -76,13 +77,42 @@ func handle(fn func(context.Context, *models.ListOptions) (*models.ListResult, e
 	}
 }
 
+func tags(fn func(context.Context) (map[string]int, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", " ")
+		enc.SetEscapeHTML(false) // idk why I hate it so much, but I do!
+
+		// Fire the real request
+		res, err := fn(r.Context())
+		if err != nil {
+			log.Printf("api(tags): %v", err)
+			enc.Encode(response{
+				Status: "error",
+				Code:   http.StatusInternalServerError,
+				Err:    "unable to fetch posts",
+			})
+			return
+		}
+
+		// Successful response!
+		enc.Encode(response{
+			Status: "success",
+			Code:   http.StatusOK,
+			Tags:   res,
+		})
+	}
+}
+
 type response struct {
-	Status string        `json:"status"`
-	Code   int           `json:"code"`
-	Err    string        `json:"error,omitempty"`
-	Data   []models.Post `json:"data,omitempty"`
-	Next   string        `json:"next_url,omitempty"`
-	Prev   string        `json:"prev_url,omitempty"`
+	Status string         `json:"status"`
+	Code   int            `json:"code"`
+	Err    string         `json:"error,omitempty"`
+	Data   []models.Post  `json:"data,omitempty"`
+	Tags   map[string]int `json:"tags,omitempty"`
+	Next   string         `json:"next_url,omitempty"`
+	Prev   string         `json:"prev_url,omitempty"`
 }
 
 func toLink(parent *url.URL, opts *models.ListOptions) string {
