@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -69,7 +70,10 @@ var (
 )
 
 func pageURL(idx int) string {
-	return fmt.Sprintf("http://thechive.com/feed/?paged=%d", idx)
+	if idx == 1 {
+		return "https://thechive.com/feed/"
+	}
+	return fmt.Sprintf("https://thechive.com/feed/?paged=%d", idx)
 }
 
 func parse(store *datastore.Store, tasker *cloudtasks.Client) http.HandlerFunc {
@@ -187,7 +191,7 @@ func (x *feedParser) processBatch(ids []int) error {
 	done := make(chan error)
 	for _, idx := range ids {
 		go func(idx int) {
-			posts, err := x.getAndParseFeed(idx)
+			_, posts, err := x.getAndParseFeed(idx)
 			if err == nil {
 				err = x.store.PutMulti(x.context, posts)
 			}
@@ -294,7 +298,7 @@ func (x *feedParser) Search(bottom, top int) (err error) {
 
 func (x *feedParser) isStop(idx int) (isStop, fullStop bool, err error) {
 	// Gather posts as necessary
-	posts, err := x.getAndParseFeed(idx)
+	found, posts, err := x.getAndParseFeed(idx)
 	if err == ErrFeedParse404 {
 		log.Printf("INFO: Reached the end of the feed list (%v)", idx)
 		return true, false, nil
@@ -303,21 +307,12 @@ func (x *feedParser) isStop(idx int) (isStop, fullStop bool, err error) {
 		log.Printf("Error decoding ChiveFeed: %s", err)
 		return false, false, err
 	}
-
-	// Check for Duplicates
-	count := 0
-	for _, post := range posts {
-		if has, err := x.store.Has(x.context, post); has || err != nil {
-			log.Printf("Found duplicate: %s %v", post.Link, err)
-			continue
-		}
-		count++
-	}
 	x.posts = append(x.posts, posts...)
 
 	// Use store_count info to determine if isStop
+	count := len(posts)
 	isStop = count == 0 || DEBUG
-	fullStop = len(posts) != count && count > 0
+	fullStop = found != count && count > 0
 	if DEBUG {
 		isStop = idx > DEPTH
 		fullStop = idx == DEPTH
@@ -329,7 +324,7 @@ func test(w http.ResponseWriter, r *http.Request) {
 	x := &feedParser{
 		context: r.Context(),
 	}
-	posts, err := x.getAndParseFeed(1)
+	_, posts, err := x.getAndParseFeed(1)
 	if err != nil {
 		panic(err)
 	}
@@ -339,42 +334,42 @@ func test(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(posts)
 }
 
-func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
+func (x *feedParser) getAndParseFeed(idx int) (found int, posts []models.Post, err error) {
 	url := pageURL(idx)
 
 	// Get Response
 	log.Printf("INFO: Parsing index %v (%v)", idx, url)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	body, err := x.fetch(url)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
-	resp, err := client.Do(req.WithContext(x.context))
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		if resp.StatusCode == 404 {
-			return nil, ErrFeedParse404
-		}
-		return nil, fmt.Errorf("feed parcing recieved a %d Status Code", resp.StatusCode)
-	}
+	defer body.Close()
 
 	// Decode Response
-	decoder := xml.NewDecoder(resp.Body)
+	decoder := xml.NewDecoder(body)
 	var feed struct {
 		Items []models.Post `xml:"channel>item"`
 	}
 	if err := decoder.Decode(&feed); err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
-	// Remove any dopamine dump posts (they link out to i.thechive.com and host external user content)
+	// Remove undesired posts to reduce the amount of mined data and trash in the database
+	//  - dopamine dump posts (they link out to i.thechive.com and host external user content)
+	//  - duplicates!
+	remove := func(i int) {
+		feed.Items = append(feed.Items[:i], feed.Items[i+1:]...)
+	}
+	found = len(feed.Items)
 	for i := len(feed.Items) - 1; i >= 0; i-- {
-		if feed.Items[i].Link == "http://i.thechive.com/dopamine-dump" {
+		post := feed.Items[i]
+		if post.Link == "http://i.thechive.com/dopamine-dump" {
 			// https://i.thechive.com/rest/uploads?queryType=dopamine-dump&offset=0
-			log.Printf("INFO: Ignoring dopamine dump (TODO: separate miner for i.thechive.com/rest/uploads): %s", feed.Items[i].Link)
-			feed.Items = append(feed.Items[:i], feed.Items[i+1:]...)
+			log.Printf("INFO: Ignoring dopamine dump (TODO: separate miner for i.thechive.com/rest/uploads): %s", post.Link)
+			remove(i)
+		} else if has, err := x.store.Has(x.context, post); has || err != nil {
+			log.Printf("INFO: Found duplicate: %s %v", post.Link, err)
+			remove(i)
 		}
 	}
 
@@ -382,9 +377,9 @@ func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 	// TODO: mine pages in parallel (worker pool?)
 	for idx := range feed.Items {
 		post := &feed.Items[idx]
-		if err = mine(post); err != nil {
+		if err = x.mine(post); err != nil {
 			log.Printf("Unable to mine page for details: %s", post.Link)
-			return nil, err
+			return found, nil, err
 		}
 		for i, img := range post.Media {
 			post.Media[i].URL = stripQuery(img.URL)
@@ -406,16 +401,23 @@ func (x *feedParser) getAndParseFeed(idx int) ([]models.Post, error) {
 			post.Media = post.Media[1:]
 		}
 	}
-	return feed.Items, nil
+	return found, feed.Items, nil
 }
 
-func mine(post *models.Post) error {
-	res, err := soup.GetWithClient(post.Link, client)
+func (x *feedParser) mine(post *models.Post) error {
+	body, err := x.fetch(post.Link)
 	if err != nil {
 		log.Printf("mine(%s): unable to fetch: %s", post.Link, err)
 		return nil
 	}
-	doc := soup.HTMLParse(res)
+	dom, err := io.ReadAll(body)
+	if err != nil {
+		return err
+	}
+	if err = body.Close(); err != nil {
+		return err
+	}
+	doc := soup.HTMLParse(string(dom))
 
 	// Pages embed single banner image
 	figure := doc.Find("figure")
@@ -497,6 +499,24 @@ func mine(post *models.Post) error {
 		}
 	}
 	return nil
+}
+
+func (x *feedParser) fetch(url string) (io.ReadCloser, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req.WithContext(x.context))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		if resp.StatusCode == 404 {
+			return nil, ErrFeedParse404
+		}
+		return nil, fmt.Errorf("feed parcing recieved a %d Status Code", resp.StatusCode)
+	}
+	return resp.Body, nil
 }
 
 func stripQuery(dirty string) string {

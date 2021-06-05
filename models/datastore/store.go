@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/datastore"
+	"go.opencensus.io/trace"
 
 	"github.com/bign8/chive-show/appengine"
 	"github.com/bign8/chive-show/models"
@@ -44,7 +45,9 @@ type datastoreClient interface {
 
 var _ models.Store = (*Store)(nil)
 
-func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models.RandomResult, error) {
+func (s *Store) Random(rctx context.Context, opts *models.RandomOptions) (*models.RandomResult, error) {
+	ctx, span := trace.StartSpan(rctx, "store.Random")
+	defer span.End()
 	if opts == nil {
 		panic("nil options == bad")
 	}
@@ -143,10 +146,14 @@ func (s *Store) Random(ctx context.Context, opts *models.RandomOptions) (*models
 	}, nil
 }
 
-func (s *Store) Has(ctx context.Context, post models.Post) (bool, error) {
+// SELECT * FROM `Post` WHERE "Humor" in tags ORDER BY date DESC
+
+func (s *Store) Has(rctx context.Context, post models.Post) (bool, error) {
 	if s.stash != nil {
 		return s.stash[post.ID], nil
 	}
+	ctx, span := trace.StartSpan(rctx, "store.Has")
+	defer span.End()
 	keys, err := s.getKeys(ctx, s.store, models.POST)
 	if err != nil {
 		return false, err
@@ -155,10 +162,17 @@ func (s *Store) Has(ctx context.Context, post models.Post) (bool, error) {
 	for _, key := range keys {
 		s.stash[key.ID] = true
 	}
+	span.AddAttributes(trace.Int64Attribute("keys", int64(len(keys))))
 	return s.stash[post.ID], nil
 }
 
-func (s *Store) PutMulti(ctx context.Context, posts []models.Post) error {
+func (s *Store) PutMulti(rctx context.Context, posts []models.Post) error {
+	if len(posts) == 0 {
+		return nil
+	}
+	ctx, span := trace.StartSpan(rctx, "store.PutMulti")
+	defer span.End()
+	span.AddAttributes(trace.Int64Attribute("posts", int64(len(posts))))
 	keys := make([]*datastore.Key, len(posts))
 	for i, post := range posts {
 		keys[i] = datastore.IDKey(models.POST, post.ID, nil)

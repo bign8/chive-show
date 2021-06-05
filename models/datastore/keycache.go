@@ -6,11 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"log"
-	"time"
 
 	"cloud.google.com/go/datastore"
+	"go.opencensus.io/trace"
 )
 
+// useful for debugging this entity: https://codebeautify.org/gzip-decompress-online
 func datastoreKey(name string) *datastore.Key {
 	return datastore.NameKey(`DatastoreKeysCache`, name, nil)
 }
@@ -80,8 +81,9 @@ func (x entityKeys) toKeys(name string) []*datastore.Key {
 }
 
 // addKeys add keys to the context
-func addKeys(c context.Context, store datastoreClient, name string, keys []*datastore.Key) error {
-	start := time.Now()
+func addKeys(ctx context.Context, store datastoreClient, name string, keys []*datastore.Key) error {
+	c, span := trace.StartSpan(ctx, "keycache.AddKeys")
+	defer span.End()
 	var container entityKeys
 	ds := datastoreKey(name)
 	err := store.Get(c, ds, &container)
@@ -90,14 +92,17 @@ func addKeys(c context.Context, store datastoreClient, name string, keys []*data
 	}
 	before := len(container)
 	container.addKeys(keys)
-	_, err = store.Put(c, ds, &container)
-	log.Printf("DEBU: addKeys took %s seconds to add %d keys", time.Since(start), len(container)-before) // TODO: use tracing spans
+	if len(container) != before {
+		_, err = store.Put(c, ds, &container)
+	}
+	span.AddAttributes(trace.Int64Attribute("keys", int64(len(container)-before)))
 	return err
 }
 
 // GetKeys returns the keys for a particular item
-func getKeys(c context.Context, store datastoreClient, name string) ([]*datastore.Key, error) {
-	start := time.Now()
+func getKeys(ctx context.Context, store datastoreClient, name string) ([]*datastore.Key, error) {
+	c, span := trace.StartSpan(ctx, "keycache.GetKeys")
+	defer span.End()
 	var container entityKeys
 	key := datastoreKey(name)
 	err := store.Get(c, key, &container)
@@ -117,7 +122,7 @@ func getKeys(c context.Context, store datastoreClient, name string) ([]*datastor
 		}
 	}
 	keys := container.toKeys(name)
-	log.Printf("DEBU: getKeys took %s seconds to get %d keys", time.Since(start), len(keys)) // TODO: use tracing spans
+	span.AddAttributes(trace.Int64Attribute("keys", int64(len(keys))))
 	return keys, nil
 }
 
