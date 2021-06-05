@@ -23,3 +23,8 @@ cover:
 	go test -cover -coverprofile=coverage.cov ./...
 	go tool cover -html=coverage.cov -o static/coverage.html
 .PHONY:=cover
+
+int:
+	@echo "This requires 'make serve' to be running"
+	go test . -v -target http://localhost:8080
+.PHONY:=int
