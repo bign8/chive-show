@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -411,7 +412,7 @@ func (x *feedParser) mine(post *models.Post) error {
 		log.Printf("mine(%s): unable to fetch: %s", post.Link, err)
 		return nil
 	}
-	dom, err := io.ReadAll(body)
+	dom, err := ioutil.ReadAll(body)
 	if err != nil {
 		return err
 	}
