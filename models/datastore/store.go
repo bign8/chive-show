@@ -2,6 +2,7 @@ package datastore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -45,7 +46,7 @@ type datastoreClient interface {
 
 var _ models.Store = (*Store)(nil)
 
-func (s *Store) Random(rctx context.Context, opts *models.RandomOptions) (*models.RandomResult, error) {
+func (s *Store) Random(rctx context.Context, opts *models.ListOptions) (*models.ListResult, error) {
 	ctx, span := trace.StartSpan(rctx, "store.Random")
 	defer span.End()
 	if opts == nil {
@@ -123,27 +124,38 @@ func (s *Store) Random(rctx context.Context, opts *models.RandomOptions) (*model
 
 	// Setup cursors for next go around
 	var (
-		next *models.RandomOptions
-		prev *models.RandomOptions
+		next *models.ListOptions
+		prev *models.ListOptions
 	)
 	if max != len(keys) {
-		next = &models.RandomOptions{
+		next = &models.ListOptions{
 			Count:  opts.Count,
 			Cursor: strconv.Itoa(max) + "~" + strconv.FormatInt(seed, 36) + "~" + strconv.FormatInt(capacity, 36),
 		}
 	}
 	if offset != 0 {
-		prev = &models.RandomOptions{
+		prev = &models.ListOptions{
 			Count:  opts.Count,
 			Cursor: strconv.Itoa(offset-opts.Count) + "~" + strconv.FormatInt(seed, 36) + "~" + strconv.FormatInt(capacity, 36),
 		}
 	}
 
-	return &models.RandomResult{
+	return &models.ListResult{
 		Posts: data,
 		Next:  next,
 		Prev:  prev,
 	}, nil
+}
+
+func (s *Store) List(rctx context.Context, opts *models.ListOptions) (*models.ListResult, error) {
+	_, span := trace.StartSpan(rctx, "store.Random")
+	defer span.End()
+
+	return nil, errors.New("TODO")
+}
+
+func (s *Store) Tags(rctx context.Context) (map[string]int, error) {
+	return nil, errors.New("TODO")
 }
 
 // SELECT * FROM `Post` WHERE "Humor" in tags ORDER BY date DESC

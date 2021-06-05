@@ -8,8 +8,6 @@ import (
 
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"contrib.go.opencensus.io/exporter/stackdriver/propagation"
-	"go.opencensus.io/plugin/ochttp"
-	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
 )
 
@@ -18,22 +16,6 @@ func AppID(context.Context) string {
 }
 
 func Main() {
-
-	// Register some views (TODO: figure out how these get reported)
-	if err := view.Register(
-		ochttp.ClientSentBytesDistribution,
-		ochttp.ClientReceivedBytesDistribution,
-		ochttp.ClientRoundtripLatencyDistribution,
-		ochttp.ClientCompletedCount,
-		ochttp.ServerRequestCountView,
-		ochttp.ServerRequestBytesView,
-		ochttp.ServerResponseBytesView,
-		ochttp.ServerLatencyView,
-		ochttp.ServerRequestCountByMethod,
-		ochttp.ServerResponseCountByStatusCode,
-	); err != nil {
-		log.Fatal(err)
-	}
 
 	// Create and register a OpenCensus Stackdriver Trace exporter.
 	exporter, err := stackdriver.NewExporter(stackdriver.Options{

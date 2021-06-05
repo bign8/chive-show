@@ -35,7 +35,7 @@ func TestRandom(t *testing.T) {
 			},
 		},
 	}
-	res, err := s.Random(context.TODO(), &models.RandomOptions{
+	res, err := s.Random(context.TODO(), &models.ListOptions{
 		Count:  3,
 		Cursor: "0~2~0",
 	})

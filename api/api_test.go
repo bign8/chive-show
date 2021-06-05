@@ -31,30 +31,28 @@ func TestCountQuery(t *testing.T) {
 	}
 }
 
-type testLister func(*models.RandomOptions) (*models.RandomResult, error)
-
-func (testLister) Has(context.Context, models.Post) (bool, error) { return false, nil }
-func (testLister) PutMulti(context.Context, []models.Post) error  { return nil }
-func (list testLister) Random(ctx context.Context, opts *models.RandomOptions) (*models.RandomResult, error) {
-	return list(opts)
-}
-
-func TestRandomFail(t *testing.T) {
-	r := httptest.NewRequest("GET", "/random", nil)
+func TestHandleFail(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
-	s := func(opts *models.RandomOptions) (*models.RandomResult, error) {
+	s := func(_ context.Context, opts *models.ListOptions) (*models.ListResult, error) {
 		return nil, errors.New("fail")
 	}
-	random(testLister(s)).ServeHTTP(w, r)
+	handle(s).ServeHTTP(w, r)
 }
 
-func TestRandomPass(t *testing.T) {
-	r := httptest.NewRequest("GET", "/random", nil)
+func TestHandlePass(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.Header.Add("x-forwarded-host", "yeet")
+	r.Header.Add("x-forwarded-proto", "yeet")
 	w := httptest.NewRecorder()
-	s := func(opts *models.RandomOptions) (*models.RandomResult, error) {
-		return &models.RandomResult{
+	s := func(_ context.Context, opts *models.ListOptions) (*models.ListResult, error) {
+		return &models.ListResult{
 			Posts: make([]models.Post, opts.Count),
+			Next: &models.ListOptions{
+				Cursor:   "curses",
+				Category: "mixed",
+			},
 		}, nil
 	}
-	random(testLister(s)).ServeHTTP(w, r)
+	handle(s).ServeHTTP(w, r)
 }
