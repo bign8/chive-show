@@ -2,14 +2,17 @@ package datastore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 
 	"cloud.google.com/go/datastore"
 	"go.opencensus.io/trace"
+	"google.golang.org/api/iterator"
 
 	"github.com/bign8/chive-show/appengine"
 	"github.com/bign8/chive-show/models"
@@ -22,7 +25,9 @@ func NewStore() (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	// rebuildTags(store)
+	if os.Getenv("REBUILD") != "" {
+		rebuildTags(store)
+	}
 	return &Store{
 		store:   store,
 		getKeys: getKeys,
@@ -43,6 +48,7 @@ type datastoreClient interface {
 	GetMulti(context.Context, []*datastore.Key, interface{}) error
 	PutMulti(context.Context, []*datastore.Key, interface{}) ([]*datastore.Key, error)
 	NewTransaction(context.Context, ...datastore.TransactionOption) (*datastore.Transaction, error)
+	Run(context.Context, *datastore.Query) *datastore.Iterator
 }
 
 var _ models.Store = (*Store)(nil)
@@ -152,22 +158,70 @@ func (s *Store) List(rctx context.Context, opts *models.ListOptions) (*models.Li
 	ctx, span := trace.StartSpan(rctx, "store.Random")
 	defer span.End()
 
+	// Prepare the query based on the opts provided
 	q := datastore.NewQuery(models.POST).Limit(opts.Count).Order("-date")
 	if opts.Tag != "" {
 		q = q.Filter("tags =", opts.Tag)
 	}
-
-	var posts []models.Post
-	_, err := s.store.GetAll(ctx, q, &posts)
-	if err != nil {
-		return nil, err
+	if len(opts.Cursor) > 1 {
+		cursor, err := datastore.DecodeCursor(opts.Cursor[1:])
+		if err != nil {
+			return nil, err
+		}
+		if dir := opts.Cursor[0]; dir == 'e' {
+			q = q.End(cursor)
+		} else if dir == 's' {
+			q = q.Start(cursor)
+		} else {
+			return nil, errors.New("expected first char in cursor to be 's' or 'e'")
+		}
 	}
-	return &models.ListResult{
-		Posts: posts,
-	}, nil
-}
+	result := &models.ListResult{}
+	iter := s.store.Run(ctx, q)
 
-// SELECT * FROM `Post` WHERE "Humor" in tags ORDER BY date DESC
+	// Load the previous cursor (calling back should set q.End to the start of this query)
+	if c, err := iter.Cursor(); err != nil {
+		return nil, err
+	} else if cs := c.String(); cs != `` {
+		result.Prev = &models.ListOptions{
+			Cursor: "e" + cs,
+			Count:  opts.Count,
+			Tag:    opts.Tag,
+		}
+	}
+
+	// Load the requested posts
+	for {
+		var p models.Post
+		_, err := iter.Next(&p)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		result.Posts = append(result.Posts, p)
+	}
+
+	// Load the next cursor (calling back should set the q.Start to the end of this query)
+	if c, err := iter.Cursor(); err != nil {
+		return nil, err
+	} else if cs := c.String(); cs != `` && len(result.Posts) == opts.Count {
+		result.Next = &models.ListOptions{
+			Cursor: "s" + cs,
+			Count:  opts.Count,
+			Tag:    opts.Tag,
+		}
+	}
+
+	// Everybody loves metadata
+	span.AddAttributes(
+		trace.Int64Attribute("posts", int64(len(result.Posts))),
+		trace.BoolAttribute("next", result.Next != nil),
+		trace.BoolAttribute("prev", result.Prev != nil),
+	)
+	return result, nil
+}
 
 func (s *Store) Has(rctx context.Context, post models.Post) (bool, error) {
 	if s.stash != nil {

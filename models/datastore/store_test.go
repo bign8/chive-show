@@ -54,7 +54,8 @@ type fake struct {
 	getMulti func([]*datastore.Key, interface{}) error
 }
 
-func (f *fake) Get(context.Context, *datastore.Key, interface{}) error { return errors.New("TODO") }
+func (f *fake) Run(context.Context, *datastore.Query) *datastore.Iterator { return nil }
+func (f *fake) Get(context.Context, *datastore.Key, interface{}) error    { return errors.New("TODO") }
 func (f *fake) GetAll(context.Context, *datastore.Query, interface{}) ([]*datastore.Key, error) {
 	return nil, errors.New("TODO")
 }
