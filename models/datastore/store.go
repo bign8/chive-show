@@ -188,6 +188,11 @@ func (s *Store) List(rctx context.Context, opts *models.ListOptions) (*models.Li
 			Count:  opts.Count,
 			Tag:    opts.Tag,
 		}
+		result.Self = &models.ListOptions{
+			Cursor: "s" + cs,
+			Count:  opts.Count,
+			Tag:    opts.Tag,
+		}
 	}
 
 	// Load the requested posts
@@ -209,6 +214,11 @@ func (s *Store) List(rctx context.Context, opts *models.ListOptions) (*models.Li
 	} else if cs := c.String(); cs != `` && len(result.Posts) == opts.Count {
 		result.Next = &models.ListOptions{
 			Cursor: "s" + cs,
+			Count:  opts.Count,
+			Tag:    opts.Tag,
+		}
+		result.Self = &models.ListOptions{
+			Cursor: "e" + cs,
 			Count:  opts.Count,
 			Tag:    opts.Tag,
 		}

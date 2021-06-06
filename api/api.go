@@ -73,6 +73,7 @@ func handle(fn func(context.Context, *models.ListOptions) (*models.ListResult, e
 			Data:   res.Posts,
 			Next:   toLink(r.URL, res.Next),
 			Prev:   toLink(r.URL, res.Prev),
+			Self:   toLink(r.URL, res.Self),
 		})
 	}
 }
@@ -113,6 +114,7 @@ type response struct {
 	Tags   map[string]int `json:"tags,omitempty"`
 	Next   string         `json:"next_url,omitempty"`
 	Prev   string         `json:"prev_url,omitempty"`
+	Self   string         `json:"self_url,omitempty"`
 }
 
 func toLink(parent *url.URL, opts *models.ListOptions) string {

@@ -115,4 +115,5 @@ type ListResult struct {
 	Posts []Post
 	Next  *ListOptions
 	Prev  *ListOptions
+	Self  *ListOptions
 }
