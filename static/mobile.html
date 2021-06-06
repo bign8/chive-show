@@ -24,6 +24,17 @@
           cursor: pointer;
           z-index: 1 /* cards cover this for some reason */
         }
+        .post > :first-child .bar-wrap {
+          height: 4px;
+          background-color: #ccc;
+          width: 100%;
+          overflow: hidden;
+        }
+        .post > :first-child .bar-wrap .bar {
+          background-color: #04AA6D;
+          width: 0%;
+          height: 4px;
+        }
         .post h5 {
           text-align: center;
           white-space: nowrap;

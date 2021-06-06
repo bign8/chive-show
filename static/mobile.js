@@ -1,4 +1,4 @@
-let next_link = '/api/v1/post/random?count=10'
+let next_link = '/api/v1/post/random?count=3'
 let scroller = document.querySelector('.scroller')
 
 // https://stackoverflow.com/a/3177838
@@ -94,11 +94,11 @@ function create_tag(tag) {
 function create_post(post) {
     let div = document.createElement('div')
     div.classList.add('post')
-    div.addEventListener('click', e => {
-        window.open(post.link)
-    })
 
     let banner = document.createElement('div')
+    banner.addEventListener('click', e => {
+        window.open(post.link)
+    })
     div.append(banner)
 
     let title = document.createElement('h5')
@@ -113,13 +113,21 @@ function create_post(post) {
     mug.classList.add('rounded-circle')
     banner.append(mug)
 
-    let since = document.createElement('small');
+    let since = document.createElement('small')
     since.innerText = post.creator + ' ' + timeSince(new Date(post.date))
     since.style.marginLeft = '.25em'
     since.classList.add('text-muted')
     banner.append(since);
 
     for (let tag of post.tags) banner.append(create_tag(tag))
+
+    let wrap = document.createElement('div')
+    wrap.classList.add('bar-wrap')
+    banner.append(wrap)
+
+    let bar = document.createElement('div')
+    bar.classList.add('bar')
+    wrap.append(bar)
 
     for (let media of post.media) div.append(create_media(media))
 
@@ -128,6 +136,7 @@ function create_post(post) {
     // pre.style.marginBottom = '0'
     // div.append(pre)
 
+    progress.observe(div)
     return div
 }
 
@@ -158,14 +167,29 @@ let bottom = new IntersectionObserver((entries, observer) => {
 let videos = new IntersectionObserver((entries, observer) => {
     entries.forEach(entry => {
         if (entry.isIntersecting && entry.target.paused) {
-            console.log('about to play video', entry)
             entry.target.play()
         } else if (!entry.target.paused) {
-            console.log('about to pause video', entry)
             entry.target.pause()
         }
     })
 })
+let progress = new IntersectionObserver((entries, observer) => {
+    // entries.forEach(entry => {
+    //     console.log(entry)
+    //     // TODO: this notifies when things enter and leave viewport
+    //     // Use this to manage the set of posts that need to have there title-bar progress updated
+    // })
+})
+
+// update progress bars on scroll
+// source: https://www.w3schools.com/howto/howto_js_scroll_indicator.asp
+function updateProgress() {
+    document.querySelectorAll('.post').forEach(node => {
+        let x = node.getBoundingClientRect()
+        node.querySelector('.bar').style.width = (x.top / -x.height * 100).toString() + "%"
+    })
+}
+window.addEventListener('scroll', e => window.requestAnimationFrame(updateProgress))
 
 // let's do this!
 pump()
