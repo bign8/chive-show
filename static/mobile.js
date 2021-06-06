@@ -1,4 +1,5 @@
-let next_link = '/api/v1/post/random?count=3'
+const BASE = '/api/v1/post?count=3'
+var next_link // state updated by pump and init
 let scroller = document.querySelector('.scroller')
 
 // https://stackoverflow.com/a/3177838
@@ -28,6 +29,8 @@ function timeSince(date) {
 }
 
 function create_media(media) {
+    // TODO: lazy load media (initial load is pretty heavy)
+
     var img;
     if (media.url.endsWith(".mp4")) {
         let src = document.createElement('source')
@@ -80,7 +83,8 @@ function create_tag(tag) {
     const colors = ['primary', 'secondary', 'success', 'warning', 'danger', 'info', 'dark']
     let color = colors[Math.floor(Math.random() * colors.length)]
 
-    let badge = document.createElement('span')
+    let badge = document.createElement('a')
+    badge.href = '#' + tag
     badge.innerText = tag
     badge.classList.add('badge')
     badge.classList.add('bg-' + color)
@@ -96,14 +100,14 @@ function create_post(post) {
     div.classList.add('post')
 
     let banner = document.createElement('div')
-    banner.addEventListener('click', e => {
-        window.open(post.link)
-    })
     div.append(banner)
 
     let title = document.createElement('h5')
     title.innerText = post.title
     title.title = post.title
+    title.addEventListener('click', e => {
+        window.open(post.link)
+    })
     banner.append(title)
 
     let mug = document.createElement('img')
@@ -167,7 +171,11 @@ let bottom = new IntersectionObserver((entries, observer) => {
 let videos = new IntersectionObserver((entries, observer) => {
     entries.forEach(entry => {
         if (entry.isIntersecting && entry.target.paused) {
-            entry.target.play()
+            try {
+                entry.target.play()
+            } catch (error) {
+                console.log('cannot play w/o user input?', error)
+            }
         } else if (!entry.target.paused) {
             entry.target.pause()
         }
@@ -191,5 +199,15 @@ function updateProgress() {
 }
 window.addEventListener('scroll', e => window.requestAnimationFrame(updateProgress))
 
+function init() {
+    console.log('about to init')
+    scroller.innerHTML = ''
+    next_link = BASE
+    let tag = document.location.hash.slice(1)
+    if (tag) next_link += "&tag=" + tag
+    pump()
+}
+
 // let's do this!
-pump()
+window.addEventListener('hashchange', init)
+init()
