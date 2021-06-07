@@ -34,10 +34,18 @@ func (s *Store) Tags(rctx context.Context) (map[string]int, error) {
 
 func rebuildTags(db *datastore.Client) {
 	var posts []models.Post
-	_, err := db.GetAll(context.Background(), datastore.NewQuery(`Post`), &posts)
+	keyz, err := db.GetAll(context.Background(), datastore.NewQuery(`Post`), &posts)
 	if err != nil {
 		panic(err)
 	}
+
+	// Rewrite all the posts in case there was a schema update
+	_, err = db.PutMulti(context.Background(), keyz, posts)
+	if err != nil {
+		panic(err)
+	}
+
+	// Update all the TAGS
 	tags := posts2tagMap(posts)
 	keys := make([]*datastore.Key, 0, len(tags))
 	list := make([]Tag, 0, len(tags))
