@@ -56,25 +56,25 @@ function create_media(media) {
         img.src = media.url
     }
 
+    if (media.title) {
+        img.title = media.title
+        img.alt = media.title
+    }
+
     let card = document.createElement('div')
     card.classList.add('card')
-    img.classList.add('card-img-top')
     card.append(img)
 
-    if (media.title) {
+    if (media.caption) {
         let body = document.createElement('div')
         body.classList.add('card-body')
         card.append(body)
-
-        let text = document.createElement('small')
-        text.classList.add('card-text')
-        img.title = media.title
-        img.alt = media.title
-        text.innerText = media.title
-        body.append(text)
+        body.innerHTML = media.caption
+        for (let child of body.children) child.classList.add('card-text')
     } else {
         img.classList.add('card-img-bottom')
     }
+    img.classList.add('card-img-top')
     return card
 }
 

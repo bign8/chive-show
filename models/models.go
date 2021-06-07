@@ -21,6 +21,7 @@ type Media struct {
 	Rating   string `datastore:"-" json:"-" xml:"rating"`
 	Category string `datastore:"-" json:"-" xml:"category"`
 	// Type     string `datastore:"type" json:"type" xml:"-"` // loaded when scraping content: attachment (for images), gif (for videos)
+	Caption string `json:"caption,omitempty"` // .gallery-caption when scraping page content
 }
 
 // Post data object

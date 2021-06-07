@@ -326,14 +326,18 @@ func test(w http.ResponseWriter, r *http.Request) {
 	x := &feedParser{
 		context: r.Context(),
 	}
-	_, posts, err := x.getAndParseFeed(1)
+	// _, posts, err := x.getAndParseFeed(1)
+	post := models.Post{
+		Link: "https://thechive.com/2021/06/06/all-they-had-to-do-was-change-a-websites-phone-number-to-avoid-this-revenge/",
+	}
+	err := x.mine(&post)
 	if err != nil {
 		panic(err)
 	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent(``, ` `)
 	enc.SetEscapeHTML(false)
-	enc.Encode(posts)
+	enc.Encode(post)
 }
 
 func (x *feedParser) getAndParseFeed(idx int) (found int, posts []models.Post, err error) {
@@ -434,9 +438,18 @@ func (x *feedParser) mine(post *models.Post) error {
 	if obj.Error != nil {
 		log.Printf("WARNING: uanble to load banner content %s: %v", post.Link, obj.Error)
 	} else {
-		post.Media = append(post.Media, models.Media{
-			URL: obj.Attrs()["src"],
-		})
+		media := models.Media{URL: obj.Attrs()["src"]}
+
+		// Attempt to scrape captions as well
+		caption := figure.Find("figcaption", "class", "gallery-caption")
+		if caption.Error == nil {
+			for _, ele := range caption.Children() {
+				media.Caption += ele.HTML()
+			}
+			media.Caption = strings.TrimSpace(media.Caption)
+		}
+
+		post.Media = append(post.Media, media)
 	}
 
 	// parse CHIVE_GALLERY_ITEMS from script id='chive-theme-js-js-extra' into JSON
@@ -495,9 +508,18 @@ func (x *feedParser) mine(post *models.Post) error {
 			continue
 		}
 		for _, img := range imgs {
-			post.Media = append(post.Media, models.Media{
-				URL: img.Attrs()["src"],
-			})
+			media := models.Media{URL: img.Attrs()["src"]}
+
+			// Attempt to scrape captions as well
+			caption := ele.Find("figcaption", "class", "gallery-caption")
+			if caption.Error == nil {
+				for _, ele := range caption.Children() {
+					media.Caption += ele.HTML()
+				}
+				media.Caption = strings.TrimSpace(media.Caption)
+			}
+
+			post.Media = append(post.Media, media)
 		}
 	}
 	return nil
