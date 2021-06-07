@@ -28,6 +28,14 @@ function timeSince(date) {
     return Math.floor(seconds) + " seconds";
 }
 
+function play_if_visible(e) {
+    let rect = e.target.getBoundingClientRect()
+    if (rect.y > 0  && rect.y < window.innerHeight) {
+        e.target.play()
+        console.log('to-play', e.target)
+    }
+}
+
 function create_media(media) {
     // TODO: lazy load media (initial load is pretty heavy)
 
@@ -41,6 +49,7 @@ function create_media(media) {
         img.muted = true // :shrug:
         img.playsInline = true
         img.append(src)
+        img.onloadeddata = play_if_visible
         videos.observe(img) // have the scroll observer play if in viewport
     } else {
         img = document.createElement('img')
