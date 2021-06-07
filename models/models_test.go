@@ -1,6 +1,10 @@
 package models
 
-import "testing"
+import (
+	"bytes"
+	"compress/gzip"
+	"testing"
+)
 
 func chk(t testing.TB, err error) {
 	if err != nil {
@@ -9,8 +13,12 @@ func chk(t testing.TB, err error) {
 }
 
 func TestLoad(t *testing.T) {
+	var b bytes.Buffer
+	w := gzip.NewWriter(&b)
+	w.Write([]byte(`[]`))
+	w.Close()
 	x := &Post{
-		MediaBytes: []byte(`[]`),
+		MediaBytes: b.Bytes(),
 	}
 	chk(t, x.Load(nil))
 }
