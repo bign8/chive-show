@@ -38,43 +38,35 @@ function create_media(media) {
         src.src = media.url
         img = document.createElement('video')
         img.loop = true
+        img.muted = true // :shrug:
         img.playsInline = true
         img.append(src)
         videos.observe(img) // have the scroll observer play if in viewport
     } else {
         img = document.createElement('img')
         img.src = media.url
-        img.title = media.title
-        img.alt = media.title
     }
 
-    // dumb huristic to determin if the title is human readable
-    if (img.title.indexOf(' ') > 0) {
-        let card = document.createElement('div')
-        card.classList.add('card')
-        card.classList.add('card-img-top')
-        card.append(img)
+    let card = document.createElement('div')
+    card.classList.add('card')
+    img.classList.add('card-img-top')
+    card.append(img)
 
+    if (media.title) {
         let body = document.createElement('div')
         body.classList.add('card-body')
         card.append(body)
 
         let text = document.createElement('small')
         text.classList.add('card-text')
+        img.title = media.title
+        img.alt = media.title
         text.innerText = media.title
         body.append(text)
-
-        card.style.marginTop = '1em'
-        card.style.marginBottom = '1em'
-        return card
+    } else {
+        img.classList.add('card-img-bottom')
     }
-
-    img.classList.add('img-fluid')
-    img.classList.add('mx-auto')
-    img.classList.add('d-block')
-    img.style.marginTop = '1em'
-    img.style.marginBottom = '1em'
-    return img
+    return card
 }
 
 function create_tag(tag) {
@@ -100,6 +92,7 @@ function create_post(post) {
     div.classList.add('post')
 
     let banner = document.createElement('div')
+    banner.classList.add('banner')
     div.append(banner)
 
     let title = document.createElement('h5')
@@ -170,11 +163,14 @@ let bottom = new IntersectionObserver((entries, observer) => {
 })
 let videos = new IntersectionObserver((entries, observer) => {
     entries.forEach(entry => {
+        if (entry.target.readyState != entry.target.HAVE_ENOUGH_DATA) return // let's not try and do things while content is loading
         if (entry.isIntersecting && entry.target.paused) {
             try {
                 entry.target.play()
+                entry.target.parentElement.classList.remove('giflock')
             } catch (error) {
                 console.log('cannot play w/o user input?', error)
+                entry.target.parentElement.classList.add('giflock')
             }
         } else if (!entry.target.paused) {
             entry.target.pause()

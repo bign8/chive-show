@@ -6,9 +6,13 @@ format:
 	goimports -w -l -local github.com/bign8/chive-show .
 .PHONY:=format
 
-deploy:
+deploy: .github/index.xml
 	gcloud app deploy --version=test --project=crucial-alpha-706 --no-promote
 .PHONY:=deploy
+
+.github/index.xml: index.yaml
+	gcloud datastore indexes create index.yaml
+	touch .github/index.xml
 
 deps:
 	brew install entr

@@ -43,6 +43,32 @@
           padding: 0 10px;
           margin-bottom: 0;
         }
+        .card {
+          margin-top: 1em;
+          margin-bottom: 1em;
+          border: none;
+        }
+        .card.giflock::before {
+          /* It's like gimble lock, but for GIFs (cause theChive uses videos :cry:) */
+          content: 'GIF';
+          position: absolute;
+          display: block;
+          top: 50%;
+          margin-top: -30px;
+          left: 50%;
+          margin-left: -30px;
+          height: 50px;
+          width: 50px;
+          text-align: center;
+          overflow: hidden;
+          background-color: #334a57;
+          line-height: 47px;
+          font-size: 11px;
+          color: #fff;
+          font-weight: 900;
+          border-radius: 35px;
+          border: 2px solid #00c300;
+        }
     </style>
   </head>
   <body>
