@@ -1,6 +1,7 @@
 package cron
 
 import (
+	"context"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -37,7 +38,8 @@ func TestMine(t *testing.T) {
 		}, nil
 	})
 	post := models.Post{Link: "testing"}
-	if err := mine(&post); err != nil {
+	parser := feedParser{context: context.TODO()}
+	if err := parser.mine(&post); err != nil {
 		t.Fatal(err)
 	}
 	if len(post.Media) != 3 {

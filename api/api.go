@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -12,7 +13,9 @@ import (
 
 // Init fired to initialize api
 func Init(store models.Store) {
-	http.Handle("/api/v1/post/random", random(store))
+	http.Handle("/api/v1/post/random", handle(store.Random))
+	http.Handle("/api/v1/post", handle(store.List))
+	http.Handle("/api/v1/tags", tags(store.Tags))
 }
 
 func getURLCount(url *url.URL) int {
@@ -23,9 +26,9 @@ func getURLCount(url *url.URL) int {
 	return val
 }
 
-// Return a list of random posts from the chive.
+// Return a list of posts from the chive.
 // Application always returns 200, use the payload to derive service/request failures.
-func random(store models.Store) http.HandlerFunc {
+func handle(fn func(context.Context, *models.ListOptions) (*models.ListResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		enc := json.NewEncoder(w)
@@ -34,16 +37,17 @@ func random(store models.Store) http.HandlerFunc {
 
 		// Parse request parameters
 		count := getURLCount(r.URL)
-		log.Printf("INFO: Requested %v random posts", count)
+		log.Printf("INFO: Requested %v posts", count)
 
 		// Fire the real request
-		opts := &models.RandomOptions{
+		opts := &models.ListOptions{
 			Count:  count,
 			Cursor: r.URL.Query().Get("cursor"),
+			Tag:    r.URL.Query().Get("tag"),
 		}
-		res, err := store.Random(r.Context(), opts)
+		res, err := fn(r.Context(), opts)
 		if err != nil {
-			log.Printf("api(store.Random): %v", err)
+			log.Printf("api(handle): %v", err)
 			enc.Encode(response{
 				Status: "error",
 				Code:   http.StatusInternalServerError,
@@ -69,26 +73,60 @@ func random(store models.Store) http.HandlerFunc {
 			Data:   res.Posts,
 			Next:   toLink(r.URL, res.Next),
 			Prev:   toLink(r.URL, res.Prev),
+			Self:   toLink(r.URL, res.Self),
+		})
+	}
+}
+
+func tags(fn func(context.Context) (map[string]int, error)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", " ")
+		enc.SetEscapeHTML(false) // idk why I hate it so much, but I do!
+
+		// Fire the real request
+		res, err := fn(r.Context())
+		if err != nil {
+			log.Printf("api(tags): %v", err)
+			enc.Encode(response{
+				Status: "error",
+				Code:   http.StatusInternalServerError,
+				Err:    "unable to fetch posts",
+			})
+			return
+		}
+
+		// Successful response!
+		enc.Encode(response{
+			Status: "success",
+			Code:   http.StatusOK,
+			Tags:   res,
 		})
 	}
 }
 
 type response struct {
-	Status string        `json:"status"`
-	Code   int           `json:"code"`
-	Err    string        `json:"error,omitempty"`
-	Data   []models.Post `json:"data,omitempty"`
-	Next   string        `json:"next_url,omitempty"`
-	Prev   string        `json:"prev_url,omitempty"`
+	Status string         `json:"status"`
+	Code   int            `json:"code"`
+	Err    string         `json:"error,omitempty"`
+	Data   []models.Post  `json:"data,omitempty"`
+	Tags   map[string]int `json:"tags,omitempty"`
+	Next   string         `json:"next_url,omitempty"`
+	Prev   string         `json:"prev_url,omitempty"`
+	Self   string         `json:"self_url,omitempty"`
 }
 
-func toLink(parent *url.URL, opts *models.RandomOptions) string {
+func toLink(parent *url.URL, opts *models.ListOptions) string {
 	if opts == nil || opts.Cursor == "" {
 		return ``
 	}
 	vals := url.Values{
 		"count":  {strconv.Itoa(opts.Count)},
 		"cursor": {opts.Cursor},
+	}
+	if opts.Tag != "" {
+		vals.Add("tag", opts.Tag)
 	}
 	return parent.ResolveReference(&url.URL{RawQuery: vals.Encode()}).String()
 }

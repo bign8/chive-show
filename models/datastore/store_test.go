@@ -35,7 +35,7 @@ func TestRandom(t *testing.T) {
 			},
 		},
 	}
-	res, err := s.Random(context.TODO(), &models.RandomOptions{
+	res, err := s.Random(context.TODO(), &models.ListOptions{
 		Count:  3,
 		Cursor: "0~2~0",
 	})
@@ -54,7 +54,8 @@ type fake struct {
 	getMulti func([]*datastore.Key, interface{}) error
 }
 
-func (f *fake) Get(context.Context, *datastore.Key, interface{}) error { return errors.New("TODO") }
+func (f *fake) Run(context.Context, *datastore.Query) *datastore.Iterator { return nil }
+func (f *fake) Get(context.Context, *datastore.Key, interface{}) error    { return errors.New("TODO") }
 func (f *fake) GetAll(context.Context, *datastore.Query, interface{}) ([]*datastore.Key, error) {
 	return nil, errors.New("TODO")
 }
@@ -66,4 +67,7 @@ func (f *fake) PutMulti(context.Context, []*datastore.Key, interface{}) ([]*data
 }
 func (f *fake) GetMulti(_ context.Context, keys []*datastore.Key, obj interface{}) error {
 	return f.getMulti(keys, obj)
+}
+func (f *fake) NewTransaction(context.Context, ...datastore.TransactionOption) (*datastore.Transaction, error) {
+	return nil, errors.New("TODO")
 }

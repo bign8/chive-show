@@ -9,11 +9,10 @@ jobs:
       GO111MODULE: on
     steps:
 
-    - name: Set up Go 1.13
-      uses: actions/setup-go@v1
+    - name: Set up Go
+      uses: actions/setup-go@v2
       with:
-        go-version: 1.13
-      id: go
+        go-version: 1.16
 
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
