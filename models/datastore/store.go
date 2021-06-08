@@ -47,8 +47,8 @@ type datastoreClient interface {
 	Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error)
 	GetMulti(context.Context, []*datastore.Key, interface{}) error
 	PutMulti(context.Context, []*datastore.Key, interface{}) ([]*datastore.Key, error)
-	NewTransaction(context.Context, ...datastore.TransactionOption) (*datastore.Transaction, error)
 	Run(context.Context, *datastore.Query) *datastore.Iterator
+	RunInTransaction(ctx context.Context, f func(tx *datastore.Transaction) error, opts ...datastore.TransactionOption) (cmt *datastore.Commit, err error)
 }
 
 var _ models.Store = (*Store)(nil)

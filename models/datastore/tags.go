@@ -62,41 +62,39 @@ func rebuildTags(db *datastore.Client) {
 
 func updateTags(ctx context.Context, client datastoreClient, posts []models.Post) error {
 	tags := posts2tagMap(posts)
-	var errz datastore.MultiError
-	for name, count := range tags {
-		if err := incrementTag(ctx, name, count, client); err != nil {
-			errz = append(errz, err)
-			log.Printf("WARN: Failed to increment tag %q by %d", name, count)
+	keys := make([]*datastore.Key, 0, len(tags))
+	for tag := range tags {
+		keys = append(keys, tagKey(tag))
+	}
+	_, err := client.RunInTransaction(ctx, func(tx *datastore.Transaction) error {
+		tagz := make([]Tag, len(keys))
+		err := tx.GetMulti(keys, tagz)
+		err = ignoreNoneSuchEntity(err)
+		if err != nil {
+			return err
 		}
-	}
-	if len(errz) != 0 {
-		return errz
-	}
-	return nil
+		for i, key := range keys {
+			tagz[i].Count += tags[key.Name]
+		}
+		_, err = tx.PutMulti(keys, tagz)
+		return err
+	})
+	return err
 }
 
-// counter example from: https://pkg.go.dev/cloud.google.com/go/datastore#Client.NewTransaction
-func incrementTag(ctx context.Context, name string, count int, client datastoreClient) (err error) {
-	key := tagKey(name)
-	var tx *datastore.Transaction
-	for i := 0; i < 3; i++ {
-		tx, err = client.NewTransaction(ctx)
-		if err != nil {
-			break
+func ignoreNoneSuchEntity(err error) error {
+	if err == datastore.ErrNoSuchEntity {
+		return nil
+	}
+	if merr, ok := err.(datastore.MultiError); ok {
+		var real bool
+		for _, e := range merr {
+			if e != nil && e != datastore.ErrNoSuchEntity {
+				return err
+			}
 		}
-
-		var c Tag
-		if err = tx.Get(key, &c); err != nil && err != datastore.ErrNoSuchEntity {
-			break
-		}
-		c.Count += count
-		if _, err = tx.Put(key, &c); err != nil {
-			break
-		}
-
-		// Attempt to commit the transaction. If there's a conflict, try again.
-		if _, err = tx.Commit(); err != datastore.ErrConcurrentTransaction {
-			break
+		if !real {
+			return nil
 		}
 	}
 	return err
