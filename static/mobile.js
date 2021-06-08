@@ -30,10 +30,7 @@ function timeSince(date) {
 
 function play_if_visible(e) {
     let rect = e.target.getBoundingClientRect()
-    if (rect.y > 0  && rect.y < window.innerHeight) {
-        e.target.play()
-        console.log('to-play', e.target)
-    }
+    if (rect.y > 0  && rect.y < window.innerHeight) e.target.play()
 }
 
 function create_media(media) {
@@ -117,10 +114,12 @@ function create_post(post) {
     mug.style.height = '20px'
     mug.style.width = '20px'
     mug.classList.add('rounded-circle')
+    mug.alt = post.creator
+    mug.title = post.creator
     banner.append(mug)
 
     let since = document.createElement('small')
-    since.innerText = post.creator + ' ' + timeSince(new Date(post.date))
+    since.innerText = timeSince(new Date(post.date))
     since.style.marginLeft = '.25em'
     since.classList.add('text-muted')
     banner.append(since);
@@ -205,7 +204,6 @@ function updateProgress() {
 window.addEventListener('scroll', e => window.requestAnimationFrame(updateProgress))
 
 function init() {
-    console.log('about to init')
     scroller.innerHTML = ''
     next_link = BASE
     let tag = document.location.hash.slice(1)
@@ -216,3 +214,28 @@ function init() {
 // let's do this!
 window.addEventListener('hashchange', init)
 init()
+
+// Tag selector options (https://getbootstrap.com/docs/5.0/components/offcanvas/)
+let tags = document.getElementById('tags')
+let bs_tags = new bootstrap.Offcanvas(tags)
+tags.addEventListener('show.bs.offcanvas', e => {
+    fetch('/api/v1/tags').then(r => r.json()).then(data => {
+        let list = document.querySelector('.list-group')
+        list.innerHTML = ''
+        for (const [tag, count] of Object.entries(data.tags)) {
+            let ele = document.createElement('div')
+            ele.classList.add('list-group-item')
+            ele.innerText = tag
+            ele.addEventListener('click', e => { // WARNING: LEAKS!!!!
+                document.location = '#' + tag
+                bs_tags.hide()
+            })
+            list.append(ele)
+
+            let span = document.createElement('span')
+            span.classList.add('badge', 'bg-primary', 'rounded-pill', 'float-end') // TODO: consistent coloring
+            span.innerText = count
+            ele.append(span)
+        }
+    })
+})
