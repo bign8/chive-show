@@ -68,6 +68,6 @@ func (f *fake) PutMulti(context.Context, []*datastore.Key, interface{}) ([]*data
 func (f *fake) GetMulti(_ context.Context, keys []*datastore.Key, obj interface{}) error {
 	return f.getMulti(keys, obj)
 }
-func (f *fake) NewTransaction(context.Context, ...datastore.TransactionOption) (*datastore.Transaction, error) {
+func (f *fake) RunInTransaction(context.Context, func(*datastore.Transaction) error, ...datastore.TransactionOption) (*datastore.Commit, error) {
 	return nil, errors.New("TODO")
 }
