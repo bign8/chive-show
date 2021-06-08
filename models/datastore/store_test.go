@@ -52,12 +52,13 @@ func TestRandom(t *testing.T) {
 
 type fake struct {
 	getMulti func([]*datastore.Key, interface{}) error
+	getAll   func(interface{}) ([]*datastore.Key, error)
 }
 
 func (f *fake) Run(context.Context, *datastore.Query) *datastore.Iterator { return nil }
 func (f *fake) Get(context.Context, *datastore.Key, interface{}) error    { return errors.New("TODO") }
-func (f *fake) GetAll(context.Context, *datastore.Query, interface{}) ([]*datastore.Key, error) {
-	return nil, errors.New("TODO")
+func (f *fake) GetAll(_ context.Context, q *datastore.Query, obj interface{}) ([]*datastore.Key, error) {
+	return f.getAll(obj)
 }
 func (f *fake) Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error) {
 	return nil, errors.New("TODO")
@@ -69,5 +70,5 @@ func (f *fake) GetMulti(_ context.Context, keys []*datastore.Key, obj interface{
 	return f.getMulti(keys, obj)
 }
 func (f *fake) RunInTransaction(context.Context, func(*datastore.Transaction) error, ...datastore.TransactionOption) (*datastore.Commit, error) {
-	return nil, errors.New("TODO")
+	return nil, nil // can't make a transaction w/o internal access to datastore package
 }
