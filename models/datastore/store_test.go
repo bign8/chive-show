@@ -58,6 +58,9 @@ type fake struct {
 func (f *fake) Run(context.Context, *datastore.Query) *datastore.Iterator { return nil }
 func (f *fake) Get(context.Context, *datastore.Key, interface{}) error    { return errors.New("TODO") }
 func (f *fake) GetAll(_ context.Context, q *datastore.Query, obj interface{}) ([]*datastore.Key, error) {
+	if f.getAll == nil {
+		return nil, nil
+	}
 	return f.getAll(obj)
 }
 func (f *fake) Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error) {
