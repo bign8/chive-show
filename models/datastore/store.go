@@ -147,6 +147,11 @@ func (s *Store) Random(rctx context.Context, opts *models.ListOptions) (*models.
 		}
 	}
 
+	// Filter tags to popular / unfiltered tags
+	if err := s.filterTags(ctx, data); err != nil {
+		return nil, err
+	}
+
 	return &models.ListResult{
 		Posts: data,
 		Next:  next,
@@ -222,6 +227,11 @@ func (s *Store) List(rctx context.Context, opts *models.ListOptions) (*models.Li
 			Count:  opts.Count,
 			Tag:    opts.Tag,
 		}
+	}
+
+	// Filter tags to popular / unfiltered tags
+	if err := s.filterTags(ctx, result.Posts); err != nil {
+		return nil, err
 	}
 
 	// Everybody loves metadata

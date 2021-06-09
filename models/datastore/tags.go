@@ -30,6 +30,9 @@ func (s *Store) Tags(rctx context.Context) (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(keys) == 0 {
+		return nil, nil // prevent divide by 0 below
+	}
 
 	// Dynamic culling of list (removing the "outliers" of <= 3; not mathematically sound, but :shrug:)
 	var total int
@@ -52,6 +55,24 @@ func (s *Store) Tags(rctx context.Context) (map[string]int, error) {
 	}
 	span.AddAttributes(trace.Int64Attribute("tags", int64(len(out))))
 	return out, nil
+}
+
+func (s *Store) filterTags(ctx context.Context, posts []models.Post) error {
+	// TODO: memory cache of s.Tags response
+	tags, err := s.Tags(ctx)
+	if err != nil {
+		return err
+	}
+	for i, post := range posts {
+		ts := post.Tags
+		for j := len(ts) - 1; j >= 0; j-- {
+			if _, ok := tags[ts[j]]; !ok {
+				post.Tags = append(post.Tags[:j], post.Tags[j+1:]...)
+			}
+		}
+		posts[i] = post
+	}
+	return nil
 }
 
 func rebuildTags(db *datastore.Client) {
