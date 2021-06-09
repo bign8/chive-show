@@ -3,6 +3,7 @@ package datastore
 import (
 	"context"
 	"log"
+	"strings"
 
 	"cloud.google.com/go/datastore"
 	"go.opencensus.io/trace"
@@ -14,19 +15,40 @@ type Tag struct {
 	Count int `datastore:"count"`
 }
 
-func tagKey(name string) *datastore.Key { return datastore.NameKey(`Tag`, name, nil) }
+// transactions involving multiple keys need to have the same parent
+var tagParent = datastore.NameKey(`Site`, `thechive`, nil)
+
+func tagKey(name string) *datastore.Key {
+	return datastore.NameKey(`Tag`, name, tagParent)
+}
 
 func (s *Store) Tags(rctx context.Context) (map[string]int, error) {
 	ctx, span := trace.StartSpan(rctx, "store.Tags")
 	defer span.End()
 	var tags []Tag
-	keys, err := s.store.GetAll(ctx, datastore.NewQuery(`Tag`).Filter("count >", 3), &tags) // TODO: dynamically set the limit based on the DB size and expected frequency
+	keys, err := s.store.GetAll(ctx, datastore.NewQuery(`Tag`).Filter("count >", 3), &tags)
 	if err != nil {
 		return nil, err
 	}
+
+	// Dynamic culling of list (removing the "outliers" of <= 3; not mathematically sound, but :shrug:)
+	var total int
+	for _, tag := range tags {
+		total += tag.Count
+	}
+	total /= len(tags) // compute the average
+	total /= 2         // very rough 75th percentile
+
 	out := make(map[string]int, len(tags))
 	for i, tag := range tags {
-		out[keys[i].Name] = tag.Count
+		if tag.Count < total {
+			continue // don't bother with smalls
+		}
+		name := keys[i].Name
+		if strings.HasSuffix(name, "staple") || name == "full" {
+			continue // cull after the fact so we can change logic and not have to migrate data
+		}
+		out[name] = tag.Count
 	}
 	span.AddAttributes(trace.Int64Attribute("tags", int64(len(out))))
 	return out, nil
