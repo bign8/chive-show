@@ -2,6 +2,26 @@ const BASE = '/api/v1/post?count=3'
 var next_link // state updated by pump and init
 let scroller = document.querySelector('.scroller')
 
+const colors = ['primary', 'secondary', 'success', 'warning', 'danger', 'info', 'dark']
+
+const signoffs = [
+    `<h4 class="alert-heading">That's everything!</h4><p class="mb-0">Go for a walk.</p>`,
+    `<h4 class="alert-heading">That's it!</h4><p class="mb-0">Better find a new hobby.</p>`,
+    `<h4 class="alert-heading">Welp...</h4><p class="mb-0">You found the end of the internet!</p>`,
+]
+
+function random(list) {
+    return list[Math.floor(Math.random() * list.length)]
+}
+
+function notify(msg, ...styles) {
+    // https://getbootstrap.com/docs/5.0/components/alerts/
+    let trailer = document.createElement('div')
+    trailer.classList.add('alert', 'text-center', ...styles)
+    trailer.innerHTML = msg
+    scroller.append(trailer)
+}
+
 // https://stackoverflow.com/a/3177838
 function timeSince(date) {
     var seconds = Math.floor((new Date() - date) / 1000);
@@ -79,8 +99,7 @@ function create_media(media) {
 function create_tag(tag) {
     // TODO: build user list of colored categories (and defaults)
     // TODO: create category equivalency map (ie: DAR = Daily Afternoon ...)
-    const colors = ['primary', 'secondary', 'success', 'warning', 'danger', 'info', 'dark']
-    let color = colors[Math.floor(Math.random() * colors.length)]
+    let color = random(colors)
 
     let badge = document.createElement('a')
     badge.href = '#' + tag
@@ -148,16 +167,17 @@ function create_post(post) {
 
 // load the next page of posts
 function pump() {
-    if (!next_link) {
-        alert("Thats everyting! Go for a walk!")
-        return
-    }
+    if (!next_link) return notify(random(signoffs), 'alert-warning')
     fetch(next_link).then(r => r.json()).then(res => {
         next_link = res.next_url
         return res.data
     }).then(posts => {
+        if (!posts) return notify(
+            `<h4 class="alert-header">Whoa</h4><p class="mb-0">We didn't find anything!<br/>Try <a href="#">Resetting filters</a></p>`,
+            'alert-danger', 'position-absolute', 'top-50', 'start-50', 'translate-middle'
+        )
         for (let post of posts) scroller.append(create_post(post))
-        bottom.observe(scroller.lastChild.previousSibling)
+        bottom.observe(scroller.lastChild.previousSibling ?? scroller.lastChild)
     })
 }
 
