@@ -44,6 +44,7 @@ function create_media(media) {
         img = document.createElement('video')
         img.loop = true
         img.muted = true // :shrug:
+        img.disableRemotePlayback = true // experimental (don't show "cast" button on mobile)
         img.playsInline = true
         img.append(src)
         img.onloadeddata = play_if_visible
