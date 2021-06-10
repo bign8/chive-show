@@ -72,6 +72,7 @@ function create_media(media) {
     } else {
         img = document.createElement('img')
         img.src = media.url
+        img.loading = "lazy"
     }
 
     if (media.title) {
