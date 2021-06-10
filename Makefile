@@ -1,5 +1,7 @@
 serve:
-	GOOGLE_APPLICATION_CREDENTIALS=.github/service-account.json go run main.go
+	GOOGLE_APPLICATION_CREDENTIALS=.github/service-account.json \
+	GOOGLE_CLOUD_PROJECT=crucial-alpha-706 \
+	go run main.go
 .PHONY:=serve
 
 format:
