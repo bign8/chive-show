@@ -239,24 +239,25 @@ init()
 // Tag selector options (https://getbootstrap.com/docs/5.0/components/offcanvas/)
 let tags = document.getElementById('tags')
 let bs_tags = new bootstrap.Offcanvas(tags)
-tags.addEventListener('show.bs.offcanvas', e => {
+function init_offscreen() {
     fetch('/api/v1/tags').then(r => r.json()).then(data => {
         let list = document.querySelector('.list-group')
         list.innerHTML = ''
         for (const [tag, count] of Object.entries(data.tags)) {
-            let ele = document.createElement('div')
-            ele.classList.add('list-group-item')
+            let ele = document.createElement('a')
+            ele.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-center')
             ele.innerText = tag
-            ele.addEventListener('click', e => { // WARNING: LEAKS!!!!
-                document.location = '#' + tag
-                bs_tags.hide()
-            })
+            ele.href = '#' + tag
+            ele.addEventListener('click', e => bs_tags.hide())
             list.append(ele)
 
             let span = document.createElement('span')
-            span.classList.add('badge', 'bg-primary', 'rounded-pill', 'float-end') // TODO: consistent coloring
+            span.classList.add('badge', 'bg-secondary', 'rounded-pill') // TODO: consistent coloring
+            span.style.width = '3em'
             span.innerText = count
             ele.append(span)
         }
+        tags.removeEventListener('show.bs.offcanvas', init_offscreen)
     })
-})
+}
+tags.addEventListener('show.bs.offcanvas', init_offscreen)
