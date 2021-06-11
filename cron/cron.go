@@ -182,7 +182,7 @@ func (x *feedParser) enqueueBatch(ids []int) error {
 				AppEngineHttpRequest: &taskspb.AppEngineHttpRequest{
 					HttpMethod:  taskspb.HttpMethod_POST,
 					RelativeUri: "/cron/batch",
-					Body:        body,
+					Body:        body, // 100kb limit
 				},
 			},
 		},

@@ -54,8 +54,6 @@ function play_if_visible(e) {
 }
 
 function create_media(media) {
-    // TODO: lazy load media (initial load is pretty heavy)
-
     var img;
     if (media.url.endsWith(".mp4")) {
         let src = document.createElement('source')
@@ -68,11 +66,14 @@ function create_media(media) {
         img.playsInline = true
         img.append(src)
         img.onloadeddata = play_if_visible
+        img.preload = "metadata" // TODO: real lazy load; best we can do w/o custom logic on when to load content
         videos.observe(img) // have the scroll observer play if in viewport
     } else {
         img = document.createElement('img')
         img.src = media.url
         img.loading = "lazy"
+        img.height = 400 // HACK: force browser to treat unloaded images with a reasonable height so not everything is loaded at once. would be awesome if server provided image dimensions
+        img.onload = img.removeAttribute.bind(img, 'height')
     }
 
     if (media.title) {
@@ -137,6 +138,7 @@ function create_post(post) {
     mug.classList.add('rounded-circle')
     mug.alt = post.creator
     mug.title = post.creator
+    mug.loading = "lazy"
     banner.append(mug)
 
     let since = document.createElement('small')
