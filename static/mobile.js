@@ -173,12 +173,14 @@ function pump() {
     if (!next_link) return notify(random(signoffs), 'alert-warning')
     fetch(next_link).then(r => r.json()).then(res => {
         next_link = res.next_url
-        return res.data
-    }).then(posts => {
-        if (!posts) return notify(
+        if (!res.self_url) return notify(
             `<h4 class="alert-header">Whoa</h4><p class="mb-0">We didn't find anything!<br/>Try <a href="#">Resetting filters</a></p>`,
             'alert-danger', 'position-absolute', 'top-50', 'start-50', 'translate-middle'
         )
+        if (!next_link && !res.data) return pump() // if we hit the end perfectly
+        return res.data
+    }).then(posts => {
+        if (!posts) return
         for (let post of posts) scroller.append(create_post(post))
         bottom.observe(scroller.lastChild.previousSibling ?? scroller.lastChild)
     })
