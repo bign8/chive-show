@@ -21,7 +21,7 @@ import (
 func NewStore() (*Store, error) {
 	// https://cloud.google.com/docs/authentication/production
 	// GOOGLE_APPLICATION_CREDENTIALS=<path-to>/service-account.json
-	store, err := datastore.NewClient(context.Background(), appengine.AppID(context.TODO()))
+	store, err := datastore.NewClient(context.Background(), appengine.ProjectID())
 	if err != nil {
 		return nil, err
 	}

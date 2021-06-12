@@ -11,15 +11,17 @@ import (
 	"go.opencensus.io/trace"
 )
 
-func AppID(context.Context) string {
-	return "crucial-alpha-706"
+func ProjectID() string {
+	// Note: there is also a metadata API service where other info is available
+	// https://pkg.go.dev/cloud.google.com/go@v0.84.0/compute/metadata#ProjectID
+	return os.Getenv(`GOOGLE_CLOUD_PROJECT`)
 }
 
 func Main() {
 
 	// Create and register a OpenCensus Stackdriver Trace exporter.
 	exporter, err := stackdriver.NewExporter(stackdriver.Options{
-		ProjectID: AppID(context.TODO()),
+		ProjectID: ProjectID(),
 	})
 	if err != nil {
 		log.Fatal(err)

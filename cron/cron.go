@@ -20,6 +20,7 @@ import (
 	"go.opencensus.io/plugin/ochttp"
 	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
 
+	"github.com/bign8/chive-show/appengine"
 	"github.com/bign8/chive-show/models"
 	"github.com/bign8/chive-show/models/datastore"
 )
@@ -175,13 +176,13 @@ func (x *feedParser) enqueueBatch(ids []int) error {
 
 	// https://godoc.org/google.golang.org/genproto/googleapis/cloud/tasks/v2#AppEngineHttpRequest
 	_, err = x.tasker.CreateTask(x.context, &taskspb.CreateTaskRequest{
-		Parent: "projects/crucial-alpha-706/locations/us-central1/queues/default",
+		Parent: "projects/" + appengine.ProjectID() + "/locations/us-central1/queues/default",
 		Task: &taskspb.Task{
 			MessageType: &taskspb.Task_AppEngineHttpRequest{
 				AppEngineHttpRequest: &taskspb.AppEngineHttpRequest{
 					HttpMethod:  taskspb.HttpMethod_POST,
 					RelativeUri: "/cron/batch",
-					Body:        body,
+					Body:        body, // 100kb limit
 				},
 			},
 		},

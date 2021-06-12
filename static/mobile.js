@@ -2,6 +2,26 @@ const BASE = '/api/v1/post?count=3'
 var next_link // state updated by pump and init
 let scroller = document.querySelector('.scroller')
 
+const colors = ['primary', 'secondary', 'success', 'warning', 'danger', 'info', 'dark']
+
+const signoffs = [
+    `<h4 class="alert-heading">That's everything!</h4><p class="mb-0">Go for a walk.</p>`,
+    `<h4 class="alert-heading">That's it!</h4><p class="mb-0">Better find a new hobby.</p>`,
+    `<h4 class="alert-heading">Welp...</h4><p class="mb-0">You found the end of the internet!</p>`,
+]
+
+function random(list) {
+    return list[Math.floor(Math.random() * list.length)]
+}
+
+function notify(msg, ...styles) {
+    // https://getbootstrap.com/docs/5.0/components/alerts/
+    let trailer = document.createElement('div')
+    trailer.classList.add('alert', 'text-center', ...styles)
+    trailer.innerHTML = msg
+    scroller.append(trailer)
+}
+
 // https://stackoverflow.com/a/3177838
 function timeSince(date) {
     var seconds = Math.floor((new Date() - date) / 1000);
@@ -34,8 +54,6 @@ function play_if_visible(e) {
 }
 
 function create_media(media) {
-    // TODO: lazy load media (initial load is pretty heavy)
-
     var img;
     if (media.url.endsWith(".mp4")) {
         let src = document.createElement('source')
@@ -44,13 +62,18 @@ function create_media(media) {
         img = document.createElement('video')
         img.loop = true
         img.muted = true // :shrug:
+        img.disableRemotePlayback = true // experimental (don't show "cast" button on mobile)
         img.playsInline = true
         img.append(src)
         img.onloadeddata = play_if_visible
+        img.preload = "metadata" // TODO: real lazy load; best we can do w/o custom logic on when to load content
         videos.observe(img) // have the scroll observer play if in viewport
     } else {
         img = document.createElement('img')
         img.src = media.url
+        img.loading = "lazy"
+        img.height = 400 // HACK: force browser to treat unloaded images with a reasonable height so not everything is loaded at once. would be awesome if server provided image dimensions
+        img.onload = img.removeAttribute.bind(img, 'height')
     }
 
     if (media.title) {
@@ -78,8 +101,7 @@ function create_media(media) {
 function create_tag(tag) {
     // TODO: build user list of colored categories (and defaults)
     // TODO: create category equivalency map (ie: DAR = Daily Afternoon ...)
-    const colors = ['primary', 'secondary', 'success', 'warning', 'danger', 'info', 'dark']
-    let color = colors[Math.floor(Math.random() * colors.length)]
+    let color = random(colors)
 
     let badge = document.createElement('a')
     badge.href = '#' + tag
@@ -116,6 +138,7 @@ function create_post(post) {
     mug.classList.add('rounded-circle')
     mug.alt = post.creator
     mug.title = post.creator
+    mug.loading = "lazy"
     banner.append(mug)
 
     let since = document.createElement('small')
@@ -147,16 +170,19 @@ function create_post(post) {
 
 // load the next page of posts
 function pump() {
-    if (!next_link) {
-        alert("Thats everyting! Go for a walk!")
-        return
-    }
+    if (!next_link) return notify(random(signoffs), 'alert-warning')
     fetch(next_link).then(r => r.json()).then(res => {
         next_link = res.next_url
+        if (!res.self_url) return notify(
+            `<h4 class="alert-header">Whoa</h4><p class="mb-0">We didn't find anything!<br/>Try <a href="#">Resetting filters</a></p>`,
+            'alert-danger', 'position-absolute', 'top-50', 'start-50', 'translate-middle'
+        )
+        if (!next_link && !res.data) return pump() // if we hit the end perfectly
         return res.data
     }).then(posts => {
+        if (!posts) return
         for (let post of posts) scroller.append(create_post(post))
-        bottom.observe(scroller.lastChild.previousSibling)
+        bottom.observe(scroller.lastChild.previousSibling ?? scroller.lastChild)
     })
 }
 
@@ -218,24 +244,25 @@ init()
 // Tag selector options (https://getbootstrap.com/docs/5.0/components/offcanvas/)
 let tags = document.getElementById('tags')
 let bs_tags = new bootstrap.Offcanvas(tags)
-tags.addEventListener('show.bs.offcanvas', e => {
+function init_offscreen() {
     fetch('/api/v1/tags').then(r => r.json()).then(data => {
         let list = document.querySelector('.list-group')
         list.innerHTML = ''
         for (const [tag, count] of Object.entries(data.tags)) {
-            let ele = document.createElement('div')
-            ele.classList.add('list-group-item')
+            let ele = document.createElement('a')
+            ele.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-center')
             ele.innerText = tag
-            ele.addEventListener('click', e => { // WARNING: LEAKS!!!!
-                document.location = '#' + tag
-                bs_tags.hide()
-            })
+            ele.href = '#' + tag
+            ele.addEventListener('click', e => bs_tags.hide())
             list.append(ele)
 
             let span = document.createElement('span')
-            span.classList.add('badge', 'bg-primary', 'rounded-pill', 'float-end') // TODO: consistent coloring
+            span.classList.add('badge', 'bg-secondary', 'rounded-pill') // TODO: consistent coloring
+            span.style.width = '3em'
             span.innerText = count
             ele.append(span)
         }
+        tags.removeEventListener('show.bs.offcanvas', init_offscreen)
     })
-})
+}
+tags.addEventListener('show.bs.offcanvas', init_offscreen)
