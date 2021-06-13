@@ -243,9 +243,9 @@ func (s *Store) List(rctx context.Context, opts *models.ListOptions) (*models.Li
 	return result, nil
 }
 
-func (s *Store) Has(rctx context.Context, post models.Post) (bool, error) {
+func (s *Store) Has(rctx context.Context, id int64) (bool, error) {
 	if s.stash != nil {
-		return s.stash[post.ID], nil
+		return s.stash[id], nil
 	}
 	ctx, span := trace.StartSpan(rctx, "store.Has")
 	defer span.End()
@@ -258,7 +258,7 @@ func (s *Store) Has(rctx context.Context, post models.Post) (bool, error) {
 		s.stash[key.ID] = true
 	}
 	span.AddAttributes(trace.Int64Attribute("keys", int64(len(keys))))
-	return s.stash[post.ID], nil
+	return s.stash[id], nil
 }
 
 func (s *Store) PutMulti(rctx context.Context, posts []models.Post) error {
@@ -285,4 +285,21 @@ func (s *Store) PutMulti(rctx context.Context, posts []models.Post) error {
 		return err
 	}
 	return addKeys(ctx, s.store, models.POST, complete)
+}
+
+func (s *Store) Put(ctx context.Context, post *models.Post) error {
+	return s.PutMulti(ctx, []models.Post{*post})
+}
+
+func (s *Store) Get(rctx context.Context, id int64) (*models.Post, error) {
+	ctx, span := trace.StartSpan(rctx, "store.PutMulti")
+	defer span.End()
+	span.AddAttributes(trace.Int64Attribute("id", id))
+
+	post := models.Post{} // allocation!
+	err := s.store.Get(ctx, datastore.IDKey(models.POST, id, nil), &post)
+	if err != nil {
+		return nil, err
+	}
+	return &post, nil
 }

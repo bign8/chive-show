@@ -35,6 +35,10 @@ type Post struct {
 	Title   string    `datastore:"title,noindex" json:"title"`
 	Creator string    `datastore:"creator,noindex" json:"creator"`
 	MugShot string    `datastore:"mugshot,noindex" json:"mugshot"`
+	Thumb   string    `datastore:"thumbnail,noindex" json:"thumbnail"`
+
+	// What version of the miner was used to scrape this post together?
+	Version *int `datastore:"version" json:"version"`
 
 	// Attributes tweaked to minimize transactions (LoadSaver stuff)
 	MediaBytes []byte  `datastore:"media,noindex" json:"-"`
@@ -119,7 +123,9 @@ type Store interface {
 	Tags(ctx context.Context) (map[string]int, error) // name => len(posts)
 	// Delete(ctx context.Context, ids []int) error
 	PutMulti(ctx context.Context, posts []Post) error
-	Has(ctx context.Context, post Post) (bool, error)
+	Has(ctx context.Context, id int64) (bool, error)
+	Get(ctx context.Context, id int64) (*Post, error)
+	Put(ctx context.Context, post *Post) error
 }
 
 type ListOptions struct {

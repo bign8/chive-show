@@ -1,6 +1,7 @@
 package cron
 
 import (
+	"context"
 	"net/http"
 	"net/http/httputil"
 
@@ -16,4 +17,8 @@ func CrawlHandler(store models.Store) http.HandlerFunc {
 		w.Write(bits)
 		// http.Error(w, "TODO", http.StatusNotImplemented)
 	}
+}
+
+func fetchRssPage(ctx context.Context, link string) ([]models.Post, error) {
+	return nil, nil
 }

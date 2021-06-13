@@ -4,19 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strings"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"contrib.go.opencensus.io/exporter/stackdriver/propagation"
-	"github.com/anaskhan96/soup"
 	"go.opencensus.io/plugin/ochttp"
 	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
 
@@ -56,7 +52,6 @@ func Init(store *datastore.Store) {
 	http.Handle("/cron/parse", parse(store, tasker))
 	http.Handle("/cron/batch", batch(store))
 	http.HandleFunc("/cron/debug", debug)
-	http.HandleFunc("/cron/test", test)
 
 	http.Handle("/cron/rebuild", RebuildHandler(store)) // Step 0: rebuild from nothing (on project init)
 	http.Handle("/cron/crawl", CrawlHandler(store))     // Step 1: search for posts (hourly)
@@ -327,30 +322,12 @@ func (x *feedParser) isStop(idx int) (isStop, fullStop bool, err error) {
 	return
 }
 
-func test(w http.ResponseWriter, r *http.Request) {
-	x := &feedParser{
-		context: r.Context(),
-	}
-	// _, posts, err := x.getAndParseFeed(1)
-	post := models.Post{
-		Link: "https://thechive.com/2021/06/06/all-they-had-to-do-was-change-a-websites-phone-number-to-avoid-this-revenge/",
-	}
-	err := x.mine(&post)
-	if err != nil {
-		panic(err)
-	}
-	enc := json.NewEncoder(w)
-	enc.SetIndent(``, ` `)
-	enc.SetEscapeHTML(false)
-	enc.Encode(post)
-}
-
 func (x *feedParser) getAndParseFeed(idx int) (found int, posts []models.Post, err error) {
 	url := pageURL(idx)
 
 	// Get Response
 	log.Printf("INFO: Parsing index %v (%v)", idx, url)
-	body, err := x.fetch(url)
+	body, err := fetch(x.context, url)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -378,7 +355,7 @@ func (x *feedParser) getAndParseFeed(idx int) (found int, posts []models.Post, e
 			// https://i.thechive.com/rest/uploads?queryType=dopamine-dump&offset=0
 			log.Printf("INFO: Ignoring dopamine dump (TODO: separate miner for i.thechive.com/rest/uploads): %s", post.Link)
 			remove(i)
-		} else if has, err := x.store.Has(x.context, post); has || err != nil {
+		} else if has, err := x.store.Has(x.context, post.ID); has || err != nil {
 			log.Printf("INFO: Found duplicate: %s %v", post.Link, err)
 			remove(i)
 		}
@@ -388,7 +365,7 @@ func (x *feedParser) getAndParseFeed(idx int) (found int, posts []models.Post, e
 	// TODO: mine pages in parallel (worker pool?)
 	for idx := range feed.Items {
 		post := &feed.Items[idx]
-		if err = x.mine(post); err != nil {
+		if err = mine(x.context, log.Default(), post); err != nil {
 			log.Printf("Unable to mine page for details: %s", post.Link)
 			return found, nil, err
 		}
@@ -415,129 +392,12 @@ func (x *feedParser) getAndParseFeed(idx int) (found int, posts []models.Post, e
 	return found, feed.Items, nil
 }
 
-// NOTE: there is an alternate link in the header of posts that points to a JSON representation of the post
-// ex: https://thechive.com/?p=3683573 => https://thechive.com/wp-json/wp/v2/posts/3683573
-func (x *feedParser) mine(post *models.Post) error {
-	body, err := x.fetch(post.Link)
-	if err != nil {
-		log.Printf("mine(%s): unable to fetch: %s", post.Link, err)
-		return nil
-	}
-	dom, err := ioutil.ReadAll(body)
-	if err != nil {
-		return err
-	}
-	if err = body.Close(); err != nil {
-		return err
-	}
-	doc := soup.HTMLParse(string(dom))
-
-	// Pages embed single banner image
-	figure := doc.Find("figure")
-	if figure.Error != nil {
-		log.Printf("WARNING: unable to load figure %s: %v", post.Link, figure.Error)
-		return nil
-	}
-	obj := figure.Find("img")
-	if obj.Error != nil {
-		obj = figure.Find("source")
-	}
-	if obj.Error != nil {
-		log.Printf("WARNING: uanble to load banner content %s: %v", post.Link, obj.Error)
-	} else {
-		media := models.Media{URL: obj.Attrs()["src"]}
-
-		// Attempt to scrape captions as well
-		caption := figure.Find("figcaption", "class", "gallery-caption")
-		if caption.Error == nil {
-			for _, ele := range caption.Children() {
-				media.Caption += ele.HTML()
-			}
-			media.Caption = strings.TrimSpace(media.Caption)
-		}
-
-		post.Media = append(post.Media, media)
-	}
-
-	// parse CHIVE_GALLERY_ITEMS from script id='chive-theme-js-js-extra' into JSON
-	// TODO: use match the image prefix? "https:\/\/thechive.com\/wp-content\/uploads\/" in the HTML and parse to closing "
-	js := doc.Find("script", "id", "chive-theme-js-js-extra")
-	if js.Error != nil {
-		log.Printf("WARNING: Unable to find script logic in %q %v", post.Link, js.Error)
-		return nil
-	}
-	src := js.FullText()
-	idx := strings.IndexByte(src, '{')
-	if idx < 0 {
-		return errors.New("unable to find opening brace")
-	}
-	src = src[idx:]
-	idx = strings.LastIndexByte(src, '}')
-	if idx < 0 {
-		return errors.New("unable to find closing brace")
-	}
-	src = src[:idx+1]
-	var what struct {
-		Items []struct {
-			HTML string `json:"html"`
-			Type string `json:"type"`
-		} `json:"items"`
-	}
-	err = json.Unmarshal([]byte(src), &what)
-	if err != nil {
-		panic(err)
-	}
-
-	// Parse HTML attributes of JSON to get images
-	for i, obj := range what.Items {
-		if obj.HTML == "" {
-			// first entry allways appears to be empty as the first post is embedded in page content
-			// that said, this warning is here in case something changes in the future
-			if i != 0 {
-				log.Printf("WARNING: got nil HTML in item %d on %s", i, post.Link)
-			}
-			continue
-		}
-		ele := soup.HTMLParse(obj.HTML)
-		if ele.Error != nil {
-			log.Printf("WARNING: unable to parse HTML of %d on %s", i, post.Link)
-			continue
-		}
-		var imgs []soup.Root
-		switch obj.Type {
-		case "gif":
-			imgs = ele.FindAll("source")
-		default:
-			imgs = ele.FindAll("img")
-		}
-		if len(imgs) == 0 {
-			log.Printf("WARNING: No media found in item %d on %s", i, post.Link)
-			continue
-		}
-		for _, img := range imgs {
-			media := models.Media{URL: img.Attrs()["src"]}
-
-			// Attempt to scrape captions as well
-			caption := ele.Find("figcaption", "class", "gallery-caption")
-			if caption.Error == nil {
-				for _, ele := range caption.Children() {
-					media.Caption += ele.HTML()
-				}
-				media.Caption = strings.TrimSpace(media.Caption)
-			}
-
-			post.Media = append(post.Media, media)
-		}
-	}
-	return nil
-}
-
-func (x *feedParser) fetch(url string) (io.ReadCloser, error) {
+func fetch(ctx context.Context, url string) (io.ReadCloser, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.Do(req.WithContext(x.context))
+	resp, err := client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
