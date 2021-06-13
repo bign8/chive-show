@@ -24,7 +24,7 @@
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Crawl Feed</h5>
-                    <p class="card-text">Fetch paginated RSS feed until we reach posts that we haven't seen before.  Store the content we are able to from the RSS feed and spawn a Mine request for each new page found.</p>
+                    <p class="card-text">Fetch RSS feed until we reach posts that we have seen before.  Store content and spawn a Mine request for each new page found.</p>
                     <form method="POST" action="/cron/crawl" class="d-grid">
                         <button type="submit" class="btn btn-outline-primary">Crawl</button>
                     </form>
@@ -36,7 +36,7 @@
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Mine Metadata</h5>
-                    <p class="card-text">Crawl the page content itself to extract additional information not available from the RSS feed.  Finally, see if we can load the dimensions for each piece of media.</p>
+                    <p class="card-text">Extract additional information not available from the RSS feed.  TODO: see if we can load the dimensions for each piece of media.</p>
                     <form method="POST" action="/cron/mine" class="d-grid">
                         <div class="input-group">
                             <span class="input-group-text">thechive.com/?p=</span>
@@ -47,6 +47,18 @@
                 </div>
                 <div class="card-footer">
                     <small class="text-muted">Spawned for each newly crawled post.</small>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Rebuild Database</h5>
+                    <p class="card-text">Use binary search to find the length of the paginated RSS feed and crawl ALL posts again.  This should not be a button :shrug:.</p>
+                    <form method="POST" action="/cron/rebuild" class="d-grid">
+                        <button type="submit" class="btn btn-outline-danger">Rebuild Everything!</button>
+                    </form>
+                </div>
+                <div class="card-footer">
+                    <small class="text-muted">This is an expensive operation!</small>
                 </div>
             </div>
         </div>

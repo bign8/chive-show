@@ -58,8 +58,9 @@ func Init(store *datastore.Store) {
 	http.HandleFunc("/cron/debug", debug)
 	http.HandleFunc("/cron/test", test)
 
-	http.Handle("/cron/crawl", CrawlHandler(store)) // Step 1: search for posts (hourly)
-	http.Handle("/cron/mine", MineHandler(store))   // Step 2: load post metadata
+	http.Handle("/cron/rebuild", RebuildHandler(store)) // Step 0: rebuild from nothing (on project init)
+	http.Handle("/cron/crawl", CrawlHandler(store))     // Step 1: search for posts (hourly)
+	http.Handle("/cron/mine", MineHandler(store))       // Step 2: load post metadata
 }
 
 func debug(w http.ResponseWriter, r *http.Request) {
