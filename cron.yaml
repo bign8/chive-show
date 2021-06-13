@@ -1,4 +1,4 @@
 cron:
 - description: Parse feeds from source
-  url: /cron/parse
+  url: /cron/crawl
   schedule: every 6 hours

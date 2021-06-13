@@ -72,11 +72,11 @@ func MineHandler(store models.Store) http.HandlerFunc {
 // Update: media links (https://thechive.com/wp-json/wp/v2/media?parent=3701780) DO contain image size .[].media_details.(height|width)
 // Update: media links referencing "FULL" for gifs are actually GIFs!
 func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
-	if post.Version == nil && len(post.Media) > 0 {
-		post.Thumb = post.Media[0].URL
-	}
-	post.Version = &latestVersion
-	post.Media = nil // idempotent (reset previous runs data)
+	// if post.Version == nil && len(post.Media) > 0 {
+	// 	post.Thumb = post.Media[0].URL
+	// }
+	// post.Version = &latestVersion
+	// post.Media = nil // idempotent (reset previous runs data)
 	body, err := fetch(ctx, post.Link)
 	if err != nil {
 		log.Printf("mine(%s): unable to fetch: %s", post.Link, err)

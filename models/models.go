@@ -35,10 +35,10 @@ type Post struct {
 	Title   string    `datastore:"title,noindex" json:"title"`
 	Creator string    `datastore:"creator,noindex" json:"creator"`
 	MugShot string    `datastore:"mugshot,noindex" json:"mugshot"`
-	Thumb   string    `datastore:"thumbnail,noindex" json:"thumbnail"`
+	// Thumb   string    `datastore:"thumbnail,noindex" json:"thumbnail"`
 
 	// What version of the miner was used to scrape this post together?
-	Version *int `datastore:"version" json:"version"`
+	// Version *int `datastore:"version" json:"version"`
 
 	// Attributes tweaked to minimize transactions (LoadSaver stuff)
 	MediaBytes []byte  `datastore:"media,noindex" json:"-"`

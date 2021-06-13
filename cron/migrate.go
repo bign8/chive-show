@@ -6,7 +6,7 @@ import (
 	"github.com/bign8/chive-show/models"
 )
 
-var latestVersion = 0
+// var latestVersion = 0
 
 func MigrateHandler(store models.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
