@@ -39,14 +39,14 @@
                     <p class="card-text">Extract additional information not available from the RSS feed.  TODO: see if we can load the dimensions for each piece of media.</p>
                     <form method="POST" action="/cron/mine" class="d-grid">
                         <div class="input-group">
-                            <span class="input-group-text">thechive.com/?p=</span>
+                            <span class="input-group-text">id</span>
                             <input type="number" class="form-control" required name="id">
                             <button type="submit" class="btn btn-outline-secondary">Mine</button>
                         </div>
                     </form>
                 </div>
                 <div class="card-footer">
-                    <small class="text-muted">Spawned for each newly crawled post.</small>
+                    <small class="text-muted">Spawned for each new post.</small>
                 </div>
             </div>
             <div class="card">
@@ -55,6 +55,18 @@
                     <p class="card-text">Use binary search to find the length of the paginated RSS feed and crawl ALL posts again.  This should not be a button :shrug:.</p>
                     <form method="POST" action="/cron/rebuild" class="d-grid">
                         <button type="submit" class="btn btn-outline-danger">Rebuild Everything!</button>
+                    </form>
+                </div>
+                <div class="card-footer">
+                    <small class="text-muted">This is an expensive operation!</small>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Migrate Database</h5>
+                    <p class="card-text">Load all post models into application memory and spit them back out into the datastore.  Usefull when adding properties to models.</p>
+                    <form method="POST" action="/cron/migrate" class="d-grid">
+                        <button type="submit" class="btn btn-outline-danger">Load & Save Everything!</button>
                     </form>
                 </div>
                 <div class="card-footer">

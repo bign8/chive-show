@@ -34,6 +34,7 @@ func Init(store *datastore.Store) {
 	http.Handle("/cron/rebuild", RebuildHandler(store)) // Step 0: rebuild from nothing (on project init)
 	http.Handle("/cron/crawl", CrawlHandler(store))     // Step 1: search for posts (on cron schedule)
 	http.Handle("/cron/mine", MineHandler(store))       // Step 2: load post metadata (from cron)
+	http.Handle("/cron/migrate", MigrateHandler(store)) // Step 4: migrate stored data (on demand)
 }
 
 var (
