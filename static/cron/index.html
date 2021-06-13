@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cron</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous">
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Bootstraps Hero Example: https://getbootstrap.com/docs/5.0/examples/heroes/ -->
+        <div class="px-4 py-5 my-5 text-center">
+            <svg class="d-block mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" width="72" height="72" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M11.5 2a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM9.05 3a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0V3h9.05zM4.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM2.05 8a2.5 2.5 0 0 1 4.9 0H16v1H6.95a2.5 2.5 0 0 1-4.9 0H0V8h2.05zm9.45 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm-2.45 1a2.5 2.5 0 0 1 4.9 0H16v1h-2.05a2.5 2.5 0 0 1-4.9 0H0v-1h9.05z"/>
+            </svg>
+            <h1 class="display-5 fw-bold">The Cron!</h1>
+            <div class="col-lg-6 mx-auto">
+                <p class="lead">Now with sexy buttons for administrative and debugging tasks!</p>
+                <p>The functionality displayed here demonstrates the backing components that drive this website.</p>
+            </div>
+        </div>
+        <div class="card-group">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Crawl Feed</h5>
+                    <p class="card-text">Fetch paginated RSS feed until we reach posts that we haven't seen before.  Store the content we are able to from the RSS feed and spawn a Mine request for each new page found.</p>
+                    <form method="POST" action="/cron/crawl" class="d-grid">
+                        <button type="submit" class="btn btn-outline-primary">Crawl</button>
+                    </form>
+                </div>
+                <div class="card-footer">
+                    <small class="text-muted">Runs every 6 hours.</small>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Mine Metadata</h5>
+                    <p class="card-text">Crawl the page content itself to extract additional information not available from the RSS feed.  Finally, see if we can load the dimensions for each piece of media.</p>
+                    <form method="POST" action="/cron/mine" class="d-grid">
+                        <div class="input-group">
+                            <span class="input-group-text">thechive.com/?p=</span>
+                            <input type="number" class="form-control" required name="id">
+                            <button type="submit" class="btn btn-outline-secondary">Mine</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer">
+                    <small class="text-muted">Spawned for each newly crawled post.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4" crossorigin="anonymous"></script> -->
+</body>
+</html>

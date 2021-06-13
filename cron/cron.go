@@ -57,6 +57,9 @@ func Init(store *datastore.Store) {
 	http.Handle("/cron/batch", batch(store))
 	http.HandleFunc("/cron/debug", debug)
 	http.HandleFunc("/cron/test", test)
+
+	http.Handle("/cron/crawl", CrawlHandler(store)) // Step 1: search for posts (hourly)
+	http.Handle("/cron/mine", MineHandler(store))   // Step 2: load post metadata
 }
 
 func debug(w http.ResponseWriter, r *http.Request) {
@@ -411,6 +414,8 @@ func (x *feedParser) getAndParseFeed(idx int) (found int, posts []models.Post, e
 	return found, feed.Items, nil
 }
 
+// NOTE: there is an alternate link in the header of posts that points to a JSON representation of the post
+// ex: https://thechive.com/?p=3683573 => https://thechive.com/wp-json/wp/v2/posts/3683573
 func (x *feedParser) mine(post *models.Post) error {
 	body, err := x.fetch(post.Link)
 	if err != nil {
