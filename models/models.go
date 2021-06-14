@@ -18,7 +18,7 @@ const POST = "Post"
 
 // Img the model for a post in an image
 type Media struct {
-	ID       int64  `json:"id"`                      // used for matching media metadata to attachment ordering
+	ID       int64  `json:"id,omitempty"`            // used for matching media metadata to attachment ordering
 	URL      string `json:"url" xml:"url,attr"`      // literal link for the asset in question
 	Title    string `json:"title,omitempty" xml:"-"` // the xml titles are worthless (especially now that the full content isn't present)
 	Rating   string `json:"-" xml:"rating"`
@@ -75,7 +75,9 @@ func (x *Post) Load(c []datastore.Property) error {
 func (x *Post) Save() ([]datastore.Property, error) {
 	var buffer bytes.Buffer
 	stream := gzip.NewWriter(&buffer)
-	if err := json.NewEncoder(stream).Encode(&x.Media); err != nil {
+	enc := json.NewEncoder(stream)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(&x.Media); err != nil {
 		return nil, err
 	}
 	if err := stream.Close(); err != nil {

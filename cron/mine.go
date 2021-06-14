@@ -49,13 +49,13 @@ func MineHandler(store models.Store) http.HandlerFunc {
 			return
 		}
 
-		// // TODO: allow a dry run?
-		// err = store.Put(r.Context(), post)
-		// if err != nil {
-		// 	log.Printf("cron(mine): Failed to store post(%d): %v", id, err)
-		// 	http.Error(w, "failed to store post", http.StatusFailedDependency)
-		// 	return
-		// }
+		// TODO: allow a dry run?
+		err = store.Put(r.Context(), post)
+		if err != nil {
+			log.Printf("cron(mine): Failed to store post(%d): %v", id, err)
+			http.Error(w, "failed to store post", http.StatusFailedDependency)
+			return
+		}
 
 		// Print meaningful output to user
 		enc := json.NewEncoder(w)
@@ -256,35 +256,15 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 		return result, err
 	}
 
-	// Load the metadata for all the media
-	mediaLink := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/media?parent=%d", id)
-	info.Printf("Media: %s", mediaLink)
-	err = fetchParse(ctx, mediaLink, func(body io.Reader) error {
-		var mediaData []struct {
-			ID      int64      `json:"id"`
-			GUID    renderable `json:"guid"`
-			Caption renderable `json:"caption"`
-			Details struct {
-				Height int `json:"height"`
-				Width  int `json:"width"`
-			} `json:"media_details"`
+	// Load the metadata for all the media (NOTE: this only loads 10 pieces of media at a time, need to load multiple times)
+	for i := int64(1); i < 20 && err == nil; i++ {
+		err = fetchMediaPage(ctx, info, id, i, meta)
+	}
+	if badFetch, ok := err.(errBadFetch); ok {
+		if badFetch.code == 400 {
+			err = nil // API appears to return 400s when fetching more pages that possible
 		}
-		if err = json.NewDecoder(body).Decode(&mediaData); err != nil {
-			info.Printf("mediaData json decode failed: %v", err)
-			return err
-		}
-		// info.Printf("mediaData: %v", mediaData)
-		for _, media := range mediaData {
-			meta[media.ID] = models.Media{
-				ID:      media.ID,
-				URL:     media.GUID.Rendered,
-				Caption: strings.TrimSpace(media.Caption.Rendered),
-				Height:  media.Details.Height,
-				Width:   media.Details.Width,
-			}
-		}
-		return nil
-	})
+	}
 	if err != nil {
 		return result, err
 	}
@@ -339,13 +319,23 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 	}
 
 	// Assign the media back to the API's result after fetching HTML's content
+	missed := make(map[int64]bool)
 	for i, media := range result.Media {
 		m, ok := meta[media.ID]
 		if !ok {
-			info.Printf("Unable to find attachment metadata for %d in %v", media.ID, meta)
+			missed[media.ID] = true
 			continue
 		}
 		result.Media[i] = m
+		delete(meta, media.ID)
+	}
+
+	// Print error for missing media metadata
+	if len(missed) > 0 {
+		info.Printf("Unable to find media %v in meta %v", missed, meta)
+	}
+	if len(meta) > 0 {
+		info.Printf("Leftover meta from JSON endpoint: %v", meta)
 	}
 
 	return result, nil
@@ -362,4 +352,35 @@ func fetchParse(ctx context.Context, url string, fn func(io.Reader) error) error
 	}
 	defer body.Close()
 	return fn(body)
+}
+
+func fetchMediaPage(ctx context.Context, info *log.Logger, id, page int64, meta map[int64]models.Media) error {
+	mediaLink := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/media?parent=%d&page=%d", id, page)
+	info.Printf("Media: %s", mediaLink)
+	return fetchParse(ctx, mediaLink, func(body io.Reader) error {
+		var mediaData []struct {
+			ID      int64      `json:"id"`
+			GUID    renderable `json:"guid"`
+			Caption renderable `json:"caption"`
+			Details struct {
+				Height int `json:"height"`
+				Width  int `json:"width"`
+			} `json:"media_details"`
+		}
+		if err := json.NewDecoder(body).Decode(&mediaData); err != nil {
+			info.Printf("mediaData json decode failed: %v", err)
+			return err
+		}
+		// info.Printf("mediaData: %v", mediaData)
+		for _, media := range mediaData {
+			meta[media.ID] = models.Media{
+				ID:      media.ID,
+				URL:     media.GUID.Rendered,
+				Caption: strings.TrimSpace(media.Caption.Rendered),
+				Height:  media.Details.Height,
+				Width:   media.Details.Width,
+			}
+		}
+		return nil
+	})
 }

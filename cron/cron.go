@@ -49,6 +49,15 @@ func pageURL(idx int) string {
 	return fmt.Sprintf("https://thechive.com/feed/?paged=%d", idx)
 }
 
+type errBadFetch struct {
+	url  string
+	code int
+}
+
+func (err errBadFetch) Error() string {
+	return fmt.Sprintf(`got a %d when fetching %s`, err.code, err.url)
+}
+
 func fetch(ctx context.Context, url string) (io.ReadCloser, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -62,7 +71,7 @@ func fetch(ctx context.Context, url string) (io.ReadCloser, error) {
 		if resp.StatusCode == 404 {
 			return nil, ErrFeedParse404
 		}
-		return nil, fmt.Errorf("feed parcing recieved a %d Status Code", resp.StatusCode)
+		return nil, errBadFetch{url: url, code: resp.StatusCode}
 	}
 	return resp.Body, nil
 }
