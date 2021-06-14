@@ -20,7 +20,7 @@ func (fn rt) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 const miningFixture = `
-<figure><img src="lead-in"></figure>
+<figure data-attachment-id="123"><img src="lead-in"></figure>
 <script id="chive-theme-js-js-extra">
 var Some white space trash = {
 	"items": [

@@ -18,7 +18,8 @@ const POST = "Post"
 
 // Img the model for a post in an image
 type Media struct {
-	URL      string `json:"url" xml:"url,attr"`
+	ID       int64  `json:"id"`                      // used for matching media metadata to attachment ordering
+	URL      string `json:"url" xml:"url,attr"`      // literal link for the asset in question
 	Title    string `json:"title,omitempty" xml:"-"` // the xml titles are worthless (especially now that the full content isn't present)
 	Rating   string `json:"-" xml:"rating"`
 	Category string `json:"-" xml:"category"`
@@ -37,7 +38,7 @@ type Post struct {
 	Title   string    `datastore:"title,noindex" json:"title"`
 	Creator string    `datastore:"creator,noindex" json:"creator"`
 	MugShot string    `datastore:"mugshot,noindex" json:"mugshot"`
-	// Thumb   string    `datastore:"thumbnail,noindex" json:"thumbnail"`
+	Thumb   string    `datastore:"thumbnail,noindex" json:"thumbnail"`
 
 	// What version of the miner was used to scrape this post together?
 	Version int `datastore:"version" json:"version"`

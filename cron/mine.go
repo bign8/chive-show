@@ -99,6 +99,11 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 		log.Printf("WARNING: unable to load figure %s: %v", post.Link, figure.Error)
 		return nil
 	}
+	first, err := strconv.ParseInt(figure.Attrs()["data-attachment-id"], 10, 64)
+	if err != nil {
+		info.Printf("Unable to load first figure ID: %v", err)
+		return nil
+	}
 	obj := figure.Find("img")
 	if obj.Error != nil {
 		obj = figure.Find("source")
@@ -106,7 +111,10 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 	if obj.Error != nil {
 		log.Printf("WARNING: uanble to load banner content %s: %v", post.Link, obj.Error)
 	} else {
-		media := models.Media{URL: obj.Attrs()["src"]}
+		media := models.Media{
+			ID:  first,
+			URL: stripQuery(obj.Attrs()["src"]),
+		}
 
 		// Attempt to scrape captions as well
 		caption := figure.Find("figcaption", "class", "gallery-caption")
@@ -140,6 +148,7 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 	src = src[:idx+1]
 	var what struct {
 		Items []struct {
+			ID   int64  `json:"id"`
 			HTML string `json:"html"`
 			Type string `json:"type"`
 		} `json:"items"`
@@ -176,7 +185,10 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 			continue
 		}
 		for _, img := range imgs {
-			media := models.Media{URL: stripQuery(img.Attrs()["src"])}
+			media := models.Media{
+				ID:  obj.ID,
+				URL: stripQuery(img.Attrs()["src"]),
+			}
 
 			// Attempt to scrape captions as well
 			caption := ele.Find("figcaption", "class", "gallery-caption")
@@ -198,22 +210,29 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 // UPDATE: the JSON media links (located at ._links["wp:attachment"][0].href) are NOT in order! still need to mine page to fetch order
 // Update: media links (https://thechive.com/wp-json/wp/v2/media?parent=3701780) DO contain image size .[].media_details.(height|width)
 // Update: media links referencing "FULL" for gifs are actually GIFs!
+// Future: until we can load the post order from the API, see if we can just load the HTML page and the attachments API for media dimensions :shrug:
 func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, error) {
 	result := &models.Post{
 		ID:      id,
 		Version: 1,
 	}
+	var (
+		createrID int
+		meta      = make(map[int64]models.Media)
+	)
 
 	// Read the JSON information about the page
 	// found this guy by reviewing the source of a chive post: link rel="alternate" type="application/json"
 	link := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/posts/%d", id)
 	info.Printf("Link: %s", link)
-	err := fetchJSON(ctx, link, func(body io.Reader) error {
+	err := fetchParse(ctx, link, func(body io.Reader) error {
 		var postInfo struct {
-			Date  string     `json:"date_gmt"`
-			Link  string     `json:"link"`
-			Title renderable `json:"title"`
-			Links map[string][]struct {
+			Date   string     `json:"date_gmt"`
+			Link   string     `json:"link"`
+			Title  renderable `json:"title"`
+			Author int        `json:"author"`
+			Thumb  string     `json:"jetpack_featured_media_url"`
+			Links  map[string][]struct {
 				Href string `json:"href"`
 			} `json:"_links"`
 		}
@@ -223,12 +242,14 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 			return err
 		}
 		// info.Printf("postInfo: %v", postInfo)
+		result.Thumb = stripQuery(postInfo.Thumb)
 		result.Title = postInfo.Title.Rendered
 		result.Link = postInfo.Link
 		if result.Date, err = time.Parse(`2006-01-02T15:04:05`, postInfo.Date); err != nil {
 			info.Printf("Unable to parse date %q: %v", postInfo.Date, err)
 			return err
 		}
+		createrID = postInfo.Author
 		return nil
 	})
 	if err != nil {
@@ -238,7 +259,7 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 	// Load the metadata for all the media
 	mediaLink := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/media?parent=%d", id)
 	info.Printf("Media: %s", mediaLink)
-	err = fetchJSON(ctx, mediaLink, func(body io.Reader) error {
+	err = fetchParse(ctx, mediaLink, func(body io.Reader) error {
 		var mediaData []struct {
 			ID      int64      `json:"id"`
 			GUID    renderable `json:"guid"`
@@ -254,13 +275,13 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 		}
 		// info.Printf("mediaData: %v", mediaData)
 		for _, media := range mediaData {
-			result.Media = append(result.Media, models.Media{
+			meta[media.ID] = models.Media{
+				ID:      media.ID,
 				URL:     media.GUID.Rendered,
-				Title:   strconv.FormatInt(media.ID, 10), // TODO: use for ordering with HTML
 				Caption: strings.TrimSpace(media.Caption.Rendered),
 				Height:  media.Details.Height,
 				Width:   media.Details.Width,
-			})
+			}
 		}
 		return nil
 	})
@@ -268,9 +289,64 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 		return result, err
 	}
 
-	// TODO: Load Creator
-	// TODO: Load Tags
-	// TODO: Order Media
+	// Load Post Creator
+	createrLink := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/users/%d", createrID)
+	info.Printf("Creator: %s", createrLink)
+	err = fetchParse(ctx, createrLink, func(body io.Reader) error {
+		var authorData struct {
+			Name string            `json:"name"`
+			URLs map[string]string `json:"avatar_urls"`
+		}
+		if err = json.NewDecoder(body).Decode(&authorData); err != nil {
+			info.Printf("authorData json decode failed: %v", err)
+			return err
+		}
+		result.Creator = authorData.Name
+		for _, link := range authorData.URLs {
+			result.MugShot = stripQuery(link)
+			return nil
+		}
+		return errors.New("no author avatar found")
+	})
+	if err != nil {
+		return result, err
+	}
+
+	// Load Post Tags
+	tagsLink := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/categories?post=%d", id)
+	info.Printf("Tags: %s", tagsLink)
+	err = fetchParse(ctx, tagsLink, func(body io.Reader) error {
+		var tagData []struct {
+			Name string `json:"name"`
+		}
+		if err = json.NewDecoder(body).Decode(&tagData); err != nil {
+			info.Printf("tagData json decode failed: %v", err)
+			return err
+		}
+		for _, tag := range tagData {
+			result.Tags = append(result.Tags, tag.Name)
+		}
+		return nil
+	})
+	if err != nil {
+		return result, err
+	}
+
+	// Reload a majority of the post to fetch the correct asset order
+	err = mine(ctx, info, result)
+	if err != nil {
+		return result, err
+	}
+
+	// Assign the media back to the API's result after fetching HTML's content
+	for i, media := range result.Media {
+		m, ok := meta[media.ID]
+		if !ok {
+			info.Printf("Unable to find attachment metadata for %d in %v", media.ID, meta)
+			continue
+		}
+		result.Media[i] = m
+	}
 
 	return result, nil
 }
@@ -279,7 +355,7 @@ type renderable struct {
 	Rendered string `json:"rendered"`
 }
 
-func fetchJSON(ctx context.Context, url string, fn func(io.Reader) error) error {
+func fetchParse(ctx context.Context, url string, fn func(io.Reader) error) error {
 	body, err := fetch(ctx, url)
 	if err != nil {
 		return err
