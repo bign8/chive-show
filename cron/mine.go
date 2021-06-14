@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/anaskhan96/soup"
 	"github.com/bign8/chive-show/models"
+	"go.opencensus.io/trace"
 )
 
 func MineHandler(store models.Store) http.HandlerFunc {
@@ -383,4 +385,44 @@ func fetchMediaPage(ctx context.Context, info *log.Logger, id, page int64, meta 
 		}
 		return nil
 	})
+}
+
+func mineMedia(rctx context.Context, info *log.Logger, post *models.Post) error {
+	ctx, span := trace.StartSpan(rctx, "cron.mineMedia")
+	defer span.End()
+	span.AddAttributes(trace.Int64Attribute(`id`, post.ID))
+
+	if err := mine(ctx, log.Default(), post); err != nil {
+		return err
+	}
+
+	meta := make(map[int64]models.Media)
+	limit := int64(math.Ceil(float64(len(post.Media)) / 10)) // paginated to 10 pages per thing
+	for i := int64(1); i <= limit; i++ {
+		if err := fetchMediaPage(ctx, info, post.ID, i, meta); err != nil {
+			return err
+		}
+	}
+
+	// Assign the media back to the API's result after fetching HTML's content
+	missed := make(map[int64]bool)
+	for i, media := range post.Media {
+		m, ok := meta[media.ID]
+		if !ok {
+			missed[media.ID] = true
+			continue
+		}
+		post.Media[i] = m
+		delete(meta, media.ID)
+	}
+
+	// Print error for missing media metadata
+	if len(missed) > 0 {
+		info.Printf("Unable to find media %v in meta %v", missed, meta)
+	}
+	if len(meta) > 0 {
+		info.Printf("Leftover meta from JSON endpoint: %v", meta)
+	}
+
+	return nil
 }

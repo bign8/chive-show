@@ -6,6 +6,8 @@ import (
 	"encoding/xml"
 	"log"
 	"net/http"
+	"regexp"
+	"time"
 
 	"github.com/bign8/chive-show/models"
 )
@@ -34,6 +36,8 @@ func CrawlHandler(store models.Store) http.HandlerFunc {
 	}
 }
 
+var clean = regexp.MustCompile(`\W\(([^\)]*)\)$`)
+
 func getAndParseFeed(ctx context.Context, store models.Store, idx int) (found int, posts []models.Post, err error) {
 	url := pageURL(idx)
 
@@ -47,8 +51,23 @@ func getAndParseFeed(ctx context.Context, store models.Store, idx int) (found in
 
 	// Decode Response
 	decoder := xml.NewDecoder(body)
+	// FUTURE: use a real object here an implement xml.Unmarshaler (see below)
 	var feed struct {
-		Items []models.Post `xml:"channel>item"`
+		Items []struct {
+			ID      int64    `xml:"post-id"`
+			Tags    []string `xml:"category"`
+			Link    string   `xml:"link"`
+			Date    string   `xml:"pubDate"`
+			Title   string   `xml:"title"`
+			Creator string   `xml:"creator"`
+			Media   []struct {
+				URL      string `xml:"url,attr"`
+				Type     string `xml:"type,attr"`
+				Title    string `xml:"-"` // the xml titles are worthless (especially now that the full content isn't present)
+				Rating   string `xml:"rating"`
+				Category string `xml:"category"`
+			} `xml:"content"`
+		} `xml:"channel>item"`
 	}
 	if err := decoder.Decode(&feed); err != nil {
 		return 0, nil, err
@@ -70,36 +89,78 @@ func getAndParseFeed(ctx context.Context, store models.Store, idx int) (found in
 		} else if has, err := store.Has(ctx, post.ID); has || err != nil {
 			log.Printf("INFO: Found duplicate: %s %v", post.Link, err)
 			remove(i)
+		} else {
+			// Remove singular videos
+			for i, media := range post.Media {
+				if media.Type == "video/mp4" {
+					log.Printf("INFO: Found video post: ignoring for now: %s", post.Link)
+					remove(i)
+					break
+				}
+			}
 		}
+
 	}
 
 	// Cleanup Response
 	// TODO: mine pages in parallel (worker pool?)
-	for idx := range feed.Items {
-		post := &feed.Items[idx]
-		if err = mine(ctx, log.Default(), post); err != nil {
-			log.Printf("Unable to mine page for details: %s", post.Link)
-			return found, nil, err
+	for _, xmlPost := range feed.Items {
+		post := models.Post{
+			ID:      xmlPost.ID,
+			Tags:    xmlPost.Tags,
+			Link:    xmlPost.Link,
+			Title:   clean.ReplaceAllLiteralString(xmlPost.Title, ``),
+			Creator: xmlPost.Creator,
 		}
-		for i, img := range post.Media {
-			post.Media[i].URL = stripQuery(img.URL)
+
+		// Convert the date to a real date
+		if post.Date, err = time.Parse(time.RFC1123Z, xmlPost.Date); err != nil {
+			return 0, nil, err
 		}
 
 		// Find the "author" image and remove it from the "media" set
-		var found bool
-		for i, media := range post.Media {
+		if len(xmlPost.Media) != 2 {
+			log.Printf("Found more than 2 medias for: %#v", xmlPost)
+		}
+		for _, media := range xmlPost.Media {
 			if media.Category == "author" {
-				found = true
-				post.MugShot = media.URL
-				post.Media = append(post.Media[:i], post.Media[i+1:]...)
-				break
+				post.MugShot = stripQuery(media.URL)
+			} else {
+				post.Thumb = stripQuery(media.URL)
 			}
 		}
-		if !found {
-			log.Printf("Unable to find author for: %#v", post)
-			post.MugShot = post.Media[0].URL
-			post.Media = post.Media[1:]
+
+		if err = mineMedia(ctx, log.Default(), &post); err != nil {
+			log.Printf("Unable to mine page for details: %s", post.Link)
+			return found, nil, err
 		}
+		posts = append(posts, post)
 	}
-	return found, feed.Items, nil
+	return found, posts, nil
 }
+
+// // UnmarshalXML implements xml.Unmarshaler for custom unmarshaling logic : https://golang.org/pkg/encoding/xml/#Unmarshaler
+// func (x *Post) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
+// 	var post struct {
+// 		ID      int64    `xml:"post-id"`
+// 		Tags    []string `xml:"category"`
+// 		Link    string   `xml:"link"`
+// 		Date    string   `xml:"pubDate"`
+// 		Title   string   `xml:"title"`
+// 		Creator string   `xml:"creator"`
+// 		Media   []Media  `xml:"content"`
+// 	}
+// 	if err = d.DecodeElement(&post, &start); err != nil {
+// 		return err
+// 	}
+// 	x.ID = post.ID
+// 	x.Tags = post.Tags
+// 	x.Link = post.Link
+// 	x.Title = clean.ReplaceAllLiteralString(post.Title, "")
+// 	x.Creator = post.Creator
+// 	x.Media = post.Media // TODO: do mugshot scrubbing here
+// 	if x.Date, err = time.Parse(time.RFC1123Z, post.Date); err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }

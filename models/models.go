@@ -5,9 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"errors"
-	"regexp"
 	"time"
 
 	"cloud.google.com/go/datastore"
@@ -18,15 +16,12 @@ const POST = "Post"
 
 // Img the model for a post in an image
 type Media struct {
-	ID       int64  `json:"id,omitempty"`            // used for matching media metadata to attachment ordering
-	URL      string `json:"url" xml:"url,attr"`      // literal link for the asset in question
-	Title    string `json:"title,omitempty" xml:"-"` // the xml titles are worthless (especially now that the full content isn't present)
-	Rating   string `json:"-" xml:"rating"`
-	Category string `json:"-" xml:"category"`
-	Caption  string `json:"caption,omitempty" xml:"-"` // .gallery-caption when scraping page content
-	// Type     string `datastore:"type" json:"type" xml:"-"` // loaded when scraping content: attachment (for images), gif (for videos)
-	Height int `json:"height,omitempty"`
-	Width  int `json:"width,omitempty"`
+	ID      int64  `json:"id,omitempty"`      // used for matching media metadata to attachment ordering
+	URL     string `json:"url"`               // literal link for the asset in question
+	Title   string `json:"title,omitempty"`   // the xml titles are worthless (especially now that the full content isn't present)
+	Caption string `json:"caption,omitempty"` // .gallery-caption when scraping page content
+	Height  int    `json:"height,omitempty"`
+	Width   int    `json:"width,omitempty"`
 }
 
 // Post data object
@@ -85,34 +80,6 @@ func (x *Post) Save() ([]datastore.Property, error) {
 	}
 	x.MediaBytes = buffer.Bytes()
 	return datastore.SaveStruct(x)
-}
-
-var clean = regexp.MustCompile(`\W\(([^\)]*)\)$`)
-
-// UnmarshalXML implements xml.Unmarshaler for custom unmarshaling logic : https://golang.org/pkg/encoding/xml/#Unmarshaler
-func (x *Post) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
-	var post struct {
-		ID      int64    `xml:"post-id"`
-		Tags    []string `xml:"category"`
-		Link    string   `xml:"link"`
-		Date    string   `xml:"pubDate"`
-		Title   string   `xml:"title"`
-		Creator string   `xml:"creator"`
-		Media   []Media  `xml:"content"`
-	}
-	if err = d.DecodeElement(&post, &start); err != nil {
-		return err
-	}
-	x.ID = post.ID
-	x.Tags = post.Tags
-	x.Link = post.Link
-	x.Title = clean.ReplaceAllLiteralString(post.Title, "")
-	x.Creator = post.Creator
-	x.Media = post.Media // TODO: do mugshot scrubbing here
-	if x.Date, err = time.Parse(time.RFC1123Z, post.Date); err != nil {
-		return err
-	}
-	return nil
 }
 
 // Storage based errors
