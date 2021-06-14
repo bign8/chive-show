@@ -3,7 +3,6 @@ package cron
 import (
 	"context"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -40,7 +39,7 @@ func TestMine(t *testing.T) {
 		}, nil
 	})
 	post := models.Post{Link: "testing"}
-	if err := mine(context.TODO(), log.Default(), &post); err != nil {
+	if err := mine(context.TODO(), logDefault(), &post); err != nil {
 		t.Fatal(err)
 	}
 	if len(post.Media) != 3 {

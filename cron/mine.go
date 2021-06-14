@@ -38,7 +38,7 @@ func MineHandler(store models.Store) http.HandlerFunc {
 
 		// Create logger to user can see whats going on too!
 		info := log.New(
-			io.MultiWriter(w, log.Default().Writer()),
+			io.MultiWriter(w, logDefault().Writer()),
 			fmt.Sprintf("mine(%d): ", id),
 			0,
 		)
@@ -392,7 +392,7 @@ func mineMedia(rctx context.Context, info *log.Logger, post *models.Post) error 
 	defer span.End()
 	span.AddAttributes(trace.Int64Attribute(`id`, post.ID))
 
-	if err := mine(ctx, log.Default(), post); err != nil {
+	if err := mine(ctx, logDefault(), post); err != nil {
 		return err
 	}
 

@@ -14,7 +14,7 @@ import (
 
 func MigrateHandler(store models.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		info := log.New(io.MultiWriter(w, log.Default().Writer()), "migrate: ", 0)
+		info := log.New(io.MultiWriter(w, logDefault().Writer()), "migrate: ", 0)
 		store, err := datastore.NewClient(r.Context(), appengine.ProjectID())
 		if err != nil {
 			info.Printf("Unable create datastore client: %v", err)

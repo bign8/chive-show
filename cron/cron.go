@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
 
 	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
 	"contrib.go.opencensus.io/exporter/stackdriver/propagation"
@@ -83,4 +85,9 @@ func stripQuery(dirty string) string {
 	}
 	obj.RawQuery = ""
 	return obj.String()
+}
+
+func logDefault() *log.Logger {
+	// appengine runs go 1.15, and log.Default was added in go 1.16
+	return log.New(os.Stderr, "", log.LstdFlags)
 }

@@ -111,6 +111,7 @@ func getAndParseFeed(ctx context.Context, store models.Store, idx int) (found in
 			Link:    xmlPost.Link,
 			Title:   clean.ReplaceAllLiteralString(xmlPost.Title, ``),
 			Creator: xmlPost.Creator,
+			Version: 1,
 		}
 
 		// Convert the date to a real date
@@ -130,7 +131,7 @@ func getAndParseFeed(ctx context.Context, store models.Store, idx int) (found in
 			}
 		}
 
-		if err = mineMedia(ctx, log.Default(), &post); err != nil {
+		if err = mineMedia(ctx, logDefault(), &post); err != nil {
 			log.Printf("Unable to mine page for details: %s", post.Link)
 			return found, nil, err
 		}
