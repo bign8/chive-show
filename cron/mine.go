@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/anaskhan96/soup"
 	"github.com/bign8/chive-show/models"
@@ -26,12 +27,12 @@ func MineHandler(store models.Store) http.HandlerFunc {
 			return
 		}
 
-		post, err := store.Get(r.Context(), id)
-		if err != nil {
-			log.Printf("cron(mine): Failed to load post(%d): %v", id, err)
-			http.Error(w, "failed to load post", http.StatusNotFound)
-			return
-		}
+		// post, err := store.Get(r.Context(), id)
+		// if err != nil {
+		// 	log.Printf("cron(mine): Failed to load post(%d): %v", id, err)
+		// 	http.Error(w, "failed to load post", http.StatusNotFound)
+		// 	return
+		// }
 
 		// Create logger to user can see whats going on too!
 		info := log.New(
@@ -41,7 +42,7 @@ func MineHandler(store models.Store) http.HandlerFunc {
 		)
 
 		// Mine the post data!
-		err = mine(r.Context(), info, post)
+		post, err := mineFull(r.Context(), info, id)
 		if err != nil {
 			log.Printf("cron(mine): Failed to mine post(%d): %v", id, err)
 			http.Error(w, "failed to mine post", http.StatusInternalServerError)
@@ -190,4 +191,99 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 		}
 	}
 	return nil
+}
+
+// NOTE: there is an alternate link in the header of posts that points to a JSON representation of the post
+// ex: https://thechive.com/?p=3701780 => https://thechive.com/wp-json/wp/v2/posts/3701780
+// UPDATE: the JSON media links (located at ._links["wp:attachment"][0].href) are NOT in order! still need to mine page to fetch order
+// Update: media links (https://thechive.com/wp-json/wp/v2/media?parent=3701780) DO contain image size .[].media_details.(height|width)
+// Update: media links referencing "FULL" for gifs are actually GIFs!
+func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, error) {
+	result := &models.Post{
+		ID:      id,
+		Version: 1,
+	}
+
+	// Read the JSON information about the page
+	// found this guy by reviewing the source of a chive post: link rel="alternate" type="application/json"
+	link := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/posts/%d", id)
+	info.Printf("Link: %s", link)
+	err := fetchJSON(ctx, link, func(body io.Reader) error {
+		var postInfo struct {
+			Date  string     `json:"date_gmt"`
+			Link  string     `json:"link"`
+			Title renderable `json:"title"`
+			Links map[string][]struct {
+				Href string `json:"href"`
+			} `json:"_links"`
+		}
+		err := json.NewDecoder(body).Decode(&postInfo)
+		if err != nil {
+			info.Printf("postInfo json decode failed: %v", err)
+			return err
+		}
+		// info.Printf("postInfo: %v", postInfo)
+		result.Title = postInfo.Title.Rendered
+		result.Link = postInfo.Link
+		if result.Date, err = time.Parse(`2006-01-02T15:04:05`, postInfo.Date); err != nil {
+			info.Printf("Unable to parse date %q: %v", postInfo.Date, err)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return result, err
+	}
+
+	// Load the metadata for all the media
+	mediaLink := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/media?parent=%d", id)
+	info.Printf("Media: %s", mediaLink)
+	err = fetchJSON(ctx, mediaLink, func(body io.Reader) error {
+		var mediaData []struct {
+			ID      int64      `json:"id"`
+			GUID    renderable `json:"guid"`
+			Caption renderable `json:"caption"`
+			Details struct {
+				Height int `json:"height"`
+				Width  int `json:"width"`
+			} `json:"media_details"`
+		}
+		if err = json.NewDecoder(body).Decode(&mediaData); err != nil {
+			info.Printf("mediaData json decode failed: %v", err)
+			return err
+		}
+		// info.Printf("mediaData: %v", mediaData)
+		for _, media := range mediaData {
+			result.Media = append(result.Media, models.Media{
+				URL:     media.GUID.Rendered,
+				Title:   strconv.FormatInt(media.ID, 10), // TODO: use for ordering with HTML
+				Caption: strings.TrimSpace(media.Caption.Rendered),
+				Height:  media.Details.Height,
+				Width:   media.Details.Width,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return result, err
+	}
+
+	// TODO: Load Creator
+	// TODO: Load Tags
+	// TODO: Order Media
+
+	return result, nil
+}
+
+type renderable struct {
+	Rendered string `json:"rendered"`
+}
+
+func fetchJSON(ctx context.Context, url string, fn func(io.Reader) error) error {
+	body, err := fetch(ctx, url)
+	if err != nil {
+		return err
+	}
+	defer body.Close()
+	return fn(body)
 }

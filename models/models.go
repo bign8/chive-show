@@ -24,6 +24,8 @@ type Media struct {
 	Category string `json:"-" xml:"category"`
 	Caption  string `json:"caption,omitempty" xml:"-"` // .gallery-caption when scraping page content
 	// Type     string `datastore:"type" json:"type" xml:"-"` // loaded when scraping content: attachment (for images), gif (for videos)
+	Height int `json:"height,omitempty"`
+	Width  int `json:"width,omitempty"`
 }
 
 // Post data object
@@ -35,7 +37,7 @@ type Post struct {
 	Title   string    `datastore:"title,noindex" json:"title"`
 	Creator string    `datastore:"creator,noindex" json:"creator"`
 	MugShot string    `datastore:"mugshot,noindex" json:"mugshot"`
-	Thumb   string    `datastore:"thumbnail,noindex" json:"thumbnail"`
+	// Thumb   string    `datastore:"thumbnail,noindex" json:"thumbnail"`
 
 	// What version of the miner was used to scrape this post together?
 	Version int `datastore:"version" json:"version"`
