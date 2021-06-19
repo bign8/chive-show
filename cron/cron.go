@@ -30,8 +30,8 @@ func Init(store *datastore.Store) {
 	if err != nil {
 		panic(err)
 	}
-	http.Handle("/cron/parse", parse(store, tasker))
-	http.Handle("/cron/batch", batch(store))
+	http.Handle("/cron/parse", parse(store, tasker)) // TODO: remove
+	http.Handle("/cron/batch", batch(store))         // TODO: remove
 
 	http.Handle("/cron/rebuild", RebuildHandler(store)) // Step 0: rebuild from nothing (on project init)
 	http.Handle("/cron/crawl", CrawlHandler(store))     // Step 1: search for posts (on cron schedule)

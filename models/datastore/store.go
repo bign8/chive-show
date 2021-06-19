@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/datastore"
+	"github.com/googleapis/google-cloud-go-testing/datastore/dsiface"
 	"go.opencensus.io/trace"
 	"google.golang.org/api/iterator"
 
@@ -29,26 +30,15 @@ func NewStore() (*Store, error) {
 		rebuildTags(store)
 	}
 	return &Store{
-		store:   store,
+		store:   dsiface.AdaptClient(store),
 		getKeys: getKeys,
 	}, nil
 }
 
 type Store struct {
-	store   datastoreClient
+	store   dsiface.Client
 	stash   map[int64]bool
-	getKeys func(c context.Context, store datastoreClient, name string) ([]*datastore.Key, error) // for testing
-}
-
-// allow faking out of the datastore for unit tests
-type datastoreClient interface {
-	Get(context.Context, *datastore.Key, interface{}) error
-	GetAll(context.Context, *datastore.Query, interface{}) ([]*datastore.Key, error)
-	Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error)
-	GetMulti(context.Context, []*datastore.Key, interface{}) error
-	PutMulti(context.Context, []*datastore.Key, interface{}) ([]*datastore.Key, error)
-	Run(context.Context, *datastore.Query) *datastore.Iterator
-	RunInTransaction(ctx context.Context, f func(tx *datastore.Transaction) error, opts ...datastore.TransactionOption) (cmt *datastore.Commit, err error)
+	getKeys func(c context.Context, store dsiface.Client, name string) ([]*datastore.Key, error) // for testing
 }
 
 var _ models.Store = (*Store)(nil)

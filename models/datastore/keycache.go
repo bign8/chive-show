@@ -8,6 +8,7 @@ import (
 	"log"
 
 	"cloud.google.com/go/datastore"
+	"github.com/googleapis/google-cloud-go-testing/datastore/dsiface"
 	"go.opencensus.io/trace"
 )
 
@@ -81,7 +82,7 @@ func (x entityKeys) toKeys(name string) []*datastore.Key {
 }
 
 // addKeys add keys to the context
-func addKeys(ctx context.Context, store datastoreClient, name string, keys []*datastore.Key) error {
+func addKeys(ctx context.Context, store dsiface.Client, name string, keys []*datastore.Key) error {
 	c, span := trace.StartSpan(ctx, "keycache.AddKeys")
 	defer span.End()
 	var container entityKeys
@@ -100,7 +101,7 @@ func addKeys(ctx context.Context, store datastoreClient, name string, keys []*da
 }
 
 // GetKeys returns the keys for a particular item
-func getKeys(ctx context.Context, store datastoreClient, name string) ([]*datastore.Key, error) {
+func getKeys(ctx context.Context, store dsiface.Client, name string) ([]*datastore.Key, error) {
 	c, span := trace.StartSpan(ctx, "keycache.GetKeys")
 	defer span.End()
 	var container entityKeys
