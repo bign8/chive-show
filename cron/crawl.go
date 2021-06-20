@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/xml"
-	"log"
 	"net/http"
 	"regexp"
 	"time"
 
+	"github.com/bign8/chive-show/appengine"
 	"github.com/bign8/chive-show/models"
 )
 
@@ -16,19 +16,19 @@ func CrawlHandler(store models.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, posts, err := getAndParseFeed(r.Context(), store, 1)
 		if err != nil {
-			log.Printf("crawl: failed to load page: %v", err)
+			appengine.Error(r.Context(), "crawl: failed to load page: %v", err)
 			http.Error(w, "failed to load feed", http.StatusFailedDependency)
 			return
 		}
 
 		err = store.PutMulti(r.Context(), posts)
 		if err != nil {
-			log.Printf("crawl: failed to store %d posts: %v", len(posts), err)
+			appengine.Error(r.Context(), "crawl: failed to store %d posts: %v", len(posts), err)
 			http.Error(w, "failed to store posts", http.StatusInternalServerError)
 			return
 		}
 
-		log.Printf("Stored %d posts", len(posts))
+		appengine.Info(r.Context(), "Stored %d posts", len(posts))
 		enc := json.NewEncoder(w)
 		enc.SetIndent(``, ` `)
 		enc.SetEscapeHTML(false)
@@ -42,7 +42,7 @@ func getAndParseFeed(ctx context.Context, store models.Store, idx int) (found in
 	url := pageURL(idx)
 
 	// Get Response
-	log.Printf("INFO: Parsing index %v (%v)", idx, url)
+	appengine.Info(ctx, "Parsing index %v (%v)", idx, url)
 	body, err := fetch(ctx, url)
 	if err != nil {
 		return 0, nil, err
@@ -84,16 +84,16 @@ func getAndParseFeed(ctx context.Context, store models.Store, idx int) (found in
 		post := feed.Items[i]
 		if post.Link == "http://i.thechive.com/dopamine-dump" {
 			// https://i.thechive.com/rest/uploads?queryType=dopamine-dump&offset=0
-			log.Printf("INFO: Ignoring dopamine dump (TODO: separate miner for i.thechive.com/rest/uploads): %s", post.Link)
+			appengine.Info(ctx, "Ignoring dopamine dump (TODO: separate miner for i.thechive.com/rest/uploads): %s", post.Link)
 			remove(i)
 		} else if has, err := store.Has(ctx, post.ID); has || err != nil {
-			log.Printf("INFO: Found duplicate: %s %v", post.Link, err)
+			appengine.Info(ctx, "Found duplicate: %s %v", post.Link, err)
 			remove(i)
 		} else {
 			// Remove singular videos
 			for i, media := range post.Media {
 				if media.Type == "video/mp4" {
-					log.Printf("INFO: Found video post: ignoring for now: %s", post.Link)
+					appengine.Info(ctx, "Found video post: ignoring for now: %s", post.Link)
 					remove(i)
 					break
 				}
@@ -121,7 +121,7 @@ func getAndParseFeed(ctx context.Context, store models.Store, idx int) (found in
 
 		// Find the "author" image and remove it from the "media" set
 		if len(xmlPost.Media) != 2 {
-			log.Printf("Found more than 2 medias for: %#v", xmlPost)
+			appengine.Warning(ctx, "Found more than 2 medias for: %#v", xmlPost)
 		}
 		for _, media := range xmlPost.Media {
 			if media.Category == "author" {
@@ -131,8 +131,8 @@ func getAndParseFeed(ctx context.Context, store models.Store, idx int) (found in
 			}
 		}
 
-		if err = mineMedia(ctx, logDefault(), &post); err != nil {
-			log.Printf("Unable to mine page for details: %s", post.Link)
+		if err = mineMedia(ctx, &post); err != nil {
+			appengine.Error(ctx, "Unable to mine page for details: %s", post.Link)
 			return found, nil, err
 		}
 		posts = append(posts, post)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"os"
 	"strconv"
@@ -78,11 +77,11 @@ func (s *Store) Random(rctx context.Context, opts *models.ListOptions) (*models.
 	// Pull keys from post keys object
 	keys, err := s.getKeys(ctx, s.store, models.POST)
 	if err != nil {
-		log.Printf("ERR: getKeys %v", err)
+		appengine.Error(ctx, "getKeys %v", err)
 		return nil, err
 	}
 	if len(keys) < opts.Count || len(keys) < offset {
-		log.Printf("ERR: Not enough keys(%v) for count(%v)", len(keys), opts.Count)
+		appengine.Error(ctx, "Not enough keys(%v) for count(%v)", len(keys), opts.Count)
 		return nil, models.ErrNotEnough
 	}
 
@@ -115,7 +114,7 @@ func (s *Store) Random(rctx context.Context, opts *models.ListOptions) (*models.
 	}
 	data := make([]models.Post, opts.Count) // TODO: cache items in memcache too (make a helper)
 	if err := s.store.GetMulti(ctx, keys[offset:max], data); err != nil {
-		log.Printf("ERR: datastore.GetMulti %v", err)
+		appengine.Error(ctx, "datastore.GetMulti %v", err)
 		return nil, err
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 
@@ -70,7 +69,7 @@ func (x *feedParser) Main(c context.Context, store *datastore.Store, tasker *clo
 	// Initial recursive edge case
 	isStop, fullStop, err := x.isStop(1)
 	if isStop || fullStop || err != nil {
-		log.Printf("INFO: Finished without recursive searching %v", err)
+		appengine.Info(c, "Finished without recursive searching %v", err)
 		if err == nil {
 			err = x.store.PutMulti(x.context, x.posts)
 		}
@@ -98,7 +97,7 @@ func (x *feedParser) Main(c context.Context, store *datastore.Store, tasker *clo
 	}
 
 	if err != nil {
-		log.Printf("Error: in Main %v", err)
+		appengine.Error(c, "in Main %v", err)
 	}
 	return err
 }
@@ -107,7 +106,7 @@ func batch(store *datastore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// TODO: ensure this task is coming from appengine
 		if r.Method != http.MethodPost {
-			log.Printf("Batch: got a %s request", r.Method)
+			appengine.Warning(r.Context(), "Batch: got a %s request", r.Method)
 			http.Error(w, "invalid method", http.StatusMethodNotAllowed)
 			return
 		}
@@ -116,7 +115,7 @@ func batch(store *datastore.Store) http.HandlerFunc {
 		defer r.Body.Close()
 		err := json.NewDecoder(r.Body).Decode(&ids)
 		if err != nil {
-			log.Printf("Batch: unmarshal error: %v", err)
+			appengine.Error(r.Context(), "Batch: unmarshal error: %v", err)
 			http.Error(w, "invalid payload", http.StatusExpectationFailed)
 			return
 		}
@@ -165,7 +164,7 @@ func (x *feedParser) processBatch(ids []int) error {
 	for i := 0; i < len(ids); i++ {
 		err := <-done
 		if err != nil {
-			log.Printf("error storing feed (at index %d): %v", i, err)
+			appengine.Error(x.context, "error storing feed (at index %d): %v", i, err)
 			return err
 		}
 	}
@@ -173,7 +172,7 @@ func (x *feedParser) processBatch(ids []int) error {
 }
 
 func (x *feedParser) processTodo() error {
-	log.Printf("INFO: Processing TODO: %v", x.todo)
+	appengine.Info(x.context, "Processing TODO: %v", x.todo)
 	// TODO: use slice offsets into x.todo array rather than creating batch arrays
 
 	var batch []int
@@ -226,7 +225,7 @@ func (x *feedParser) Search(bottom, top int) (err error) {
 	    return infinite_length(bottom, top)  # Tail recursion!!!
 	*/
 	if bottom == top-1 {
-		log.Printf("INFO: TOP OF RANGE FOUND! @%d", top)
+		appengine.Info(x.context, "TOP OF RANGE FOUND! @%d", top)
 		x.addRange(bottom, top)
 		return nil
 	}
@@ -264,11 +263,11 @@ func (x *feedParser) isStop(idx int) (isStop, fullStop bool, err error) {
 	// Gather posts as necessary
 	found, posts, err := getAndParseFeed(x.context, x.store, idx)
 	if err == ErrFeedParse404 {
-		log.Printf("INFO: Reached the end of the feed list (%v)", idx)
+		appengine.Info(x.context, "Reached the end of the feed list (%v)", idx)
 		return true, false, nil
 	}
 	if err != nil {
-		log.Printf("Error decoding ChiveFeed: %s", err)
+		appengine.Error(x.context, "decoding ChiveFeed: %s", err)
 		return false, false, err
 	}
 	x.posts = append(x.posts, posts...)

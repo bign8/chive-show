@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -15,8 +14,10 @@ import (
 	"time"
 
 	"github.com/anaskhan96/soup"
-	"github.com/bign8/chive-show/models"
 	"go.opencensus.io/trace"
+
+	"github.com/bign8/chive-show/appengine"
+	"github.com/bign8/chive-show/models"
 )
 
 func MineHandler(store models.Store) http.HandlerFunc {
@@ -24,29 +25,22 @@ func MineHandler(store models.Store) http.HandlerFunc {
 		sid := r.FormValue("id")
 		id, err := strconv.ParseInt(sid, 10, 64)
 		if err != nil {
-			log.Printf("cron(mine): Failed to parse id(%s): %v", sid, err)
+			appengine.Error(r.Context(), "cron(mine): Failed to parse id(%s): %v", sid, err)
 			http.Error(w, "unable to parse id", http.StatusExpectationFailed)
 			return
 		}
 
 		// post, err := store.Get(r.Context(), id)
 		// if err != nil {
-		// 	log.Printf("cron(mine): Failed to load post(%d): %v", id, err)
+		// 	appengine.Error(r.Context(), "cron(mine): Failed to load post(%d): %v", id, err)
 		// 	http.Error(w, "failed to load post", http.StatusNotFound)
 		// 	return
 		// }
 
-		// Create logger to user can see whats going on too!
-		info := log.New(
-			io.MultiWriter(w, logDefault().Writer()),
-			fmt.Sprintf("mine(%d): ", id),
-			0,
-		)
-
 		// Mine the post data!
-		post, err := mineFull(r.Context(), info, id)
+		post, err := mineFull(r.Context(), id)
 		if err != nil {
-			log.Printf("cron(mine): Failed to mine post(%d): %v", id, err)
+			appengine.Error(r.Context(), "cron(mine): Failed to mine post(%d): %v", id, err)
 			http.Error(w, "failed to mine post", http.StatusInternalServerError)
 			return
 		}
@@ -54,7 +48,7 @@ func MineHandler(store models.Store) http.HandlerFunc {
 		// TODO: allow a dry run?
 		err = store.Put(r.Context(), post)
 		if err != nil {
-			log.Printf("cron(mine): Failed to store post(%d): %v", id, err)
+			appengine.Error(r.Context(), "cron(mine): Failed to store post(%d): %v", id, err)
 			http.Error(w, "failed to store post", http.StatusFailedDependency)
 			return
 		}
@@ -64,7 +58,7 @@ func MineHandler(store models.Store) http.HandlerFunc {
 		enc.SetIndent(``, ` `)
 		enc.SetEscapeHTML(false)
 		if err = enc.Encode(post); err != nil {
-			log.Printf("cron(mine): Failed to encode post(%d): %v", id, err)
+			appengine.Error(r.Context(), "cron(mine): Failed to encode post(%d): %v", id, err)
 		}
 	}
 }
@@ -74,7 +68,7 @@ func MineHandler(store models.Store) http.HandlerFunc {
 // UPDATE: the JSON media links (located at ._links["wp:attachment"][0].href) are NOT in order! still need to mine page to fetch order
 // Update: media links (https://thechive.com/wp-json/wp/v2/media?parent=3701780) DO contain image size .[].media_details.(height|width)
 // Update: media links referencing "FULL" for gifs are actually GIFs!
-func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
+func mine(ctx context.Context, post *models.Post) error {
 	// if post.Version == nil && len(post.Media) > 0 {
 	// 	post.Thumb = post.Media[0].URL
 	// }
@@ -82,14 +76,14 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 	// post.Media = nil // idempotent (reset previous runs data)
 	body, err := fetch(ctx, post.Link)
 	if err != nil {
-		log.Printf("mine(%s): unable to fetch: %s", post.Link, err)
+		appengine.Error(ctx, "mine(%s): unable to fetch: %s", post.Link, err)
 		return nil
 	}
 	dom, err := ioutil.ReadAll(body)
 	if err != nil {
 		return err
 	}
-	info.Printf("Loaded %d bytes from %s", len(dom), post.Link)
+	appengine.Info(ctx, "Loaded %d bytes from %s", len(dom), post.Link)
 	if err = body.Close(); err != nil {
 		return err
 	}
@@ -98,12 +92,12 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 	// Pages embed single banner image
 	figure := doc.Find("figure")
 	if figure.Error != nil {
-		log.Printf("WARNING: unable to load figure %s: %v", post.Link, figure.Error)
+		appengine.Warning(ctx, "unable to load figure %s: %v", post.Link, figure.Error)
 		return nil
 	}
 	first, err := strconv.ParseInt(figure.Attrs()["data-attachment-id"], 10, 64)
 	if err != nil {
-		info.Printf("Unable to load first figure ID: %v", err)
+		appengine.Warning(ctx, "Unable to load first figure ID: %v", err)
 		return nil
 	}
 	obj := figure.Find("img")
@@ -111,7 +105,7 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 		obj = figure.Find("source")
 	}
 	if obj.Error != nil {
-		log.Printf("WARNING: uanble to load banner content %s: %v", post.Link, obj.Error)
+		appengine.Warning(ctx, "uanble to load banner content %s: %v", post.Link, obj.Error)
 	} else {
 		media := models.Media{
 			ID:  first,
@@ -134,7 +128,7 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 	// TODO: use match the image prefix? "https:\/\/thechive.com\/wp-content\/uploads\/" in the HTML and parse to closing "
 	js := doc.Find("script", "id", "chive-theme-js-js-extra")
 	if js.Error != nil {
-		log.Printf("WARNING: Unable to find script logic in %q %v", post.Link, js.Error)
+		appengine.Warning(ctx, "Unable to find script logic in %q %v", post.Link, js.Error)
 		return nil
 	}
 	src := js.FullText()
@@ -166,13 +160,13 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 			// first entry allways appears to be empty as the first post is embedded in page content
 			// that said, this warning is here in case something changes in the future
 			if i != 0 {
-				log.Printf("WARNING: got nil HTML in item %d on %s", i, post.Link)
+				appengine.Warning(ctx, "got nil HTML in item %d on %s", i, post.Link)
 			}
 			continue
 		}
 		ele := soup.HTMLParse(obj.HTML)
 		if ele.Error != nil {
-			log.Printf("WARNING: unable to parse HTML of %d on %s", i, post.Link)
+			appengine.Warning(ctx, "unable to parse HTML of %d on %s", i, post.Link)
 			continue
 		}
 		var imgs []soup.Root
@@ -183,7 +177,7 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 			imgs = ele.FindAll("img")
 		}
 		if len(imgs) == 0 {
-			log.Printf("WARNING: No media found in item %d on %s", i, post.Link)
+			appengine.Warning(ctx, "No media found in item %d on %s", i, post.Link)
 			continue
 		}
 		for _, img := range imgs {
@@ -213,7 +207,7 @@ func mine(ctx context.Context, info *log.Logger, post *models.Post) error {
 // Update: media links (https://thechive.com/wp-json/wp/v2/media?parent=3701780) DO contain image size .[].media_details.(height|width)
 // Update: media links referencing "FULL" for gifs are actually GIFs!
 // Future: until we can load the post order from the API, see if we can just load the HTML page and the attachments API for media dimensions :shrug:
-func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, error) {
+func mineFull(ctx context.Context, id int64) (*models.Post, error) {
 	result := &models.Post{
 		ID:      id,
 		Version: 1,
@@ -226,7 +220,7 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 	// Read the JSON information about the page
 	// found this guy by reviewing the source of a chive post: link rel="alternate" type="application/json"
 	link := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/posts/%d", id)
-	info.Printf("Link: %s", link)
+	appengine.Info(ctx, "Link: %s", link)
 	err := fetchParse(ctx, link, func(body io.Reader) error {
 		var postInfo struct {
 			Date   string     `json:"date_gmt"`
@@ -240,7 +234,7 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 		}
 		err := json.NewDecoder(body).Decode(&postInfo)
 		if err != nil {
-			info.Printf("postInfo json decode failed: %v", err)
+			appengine.Error(ctx, "postInfo json decode failed: %v", err)
 			return err
 		}
 		// info.Printf("postInfo: %v", postInfo)
@@ -248,7 +242,7 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 		result.Title = postInfo.Title.Rendered
 		result.Link = postInfo.Link
 		if result.Date, err = time.Parse(`2006-01-02T15:04:05`, postInfo.Date); err != nil {
-			info.Printf("Unable to parse date %q: %v", postInfo.Date, err)
+			appengine.Error(ctx, "Unable to parse date %q: %v", postInfo.Date, err)
 			return err
 		}
 		createrID = postInfo.Author
@@ -260,7 +254,7 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 
 	// Load the metadata for all the media (NOTE: this only loads 10 pieces of media at a time, need to load multiple times)
 	for i := int64(1); i < 20 && err == nil; i++ {
-		err = fetchMediaPage(ctx, info, id, i, meta)
+		err = fetchMediaPage(ctx, id, i, meta)
 	}
 	if badFetch, ok := err.(errBadFetch); ok {
 		if badFetch.code == 400 {
@@ -273,14 +267,14 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 
 	// Load Post Creator
 	createrLink := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/users/%d", createrID)
-	info.Printf("Creator: %s", createrLink)
+	appengine.Info(ctx, "Creator: %s", createrLink)
 	err = fetchParse(ctx, createrLink, func(body io.Reader) error {
 		var authorData struct {
 			Name string            `json:"name"`
 			URLs map[string]string `json:"avatar_urls"`
 		}
 		if err = json.NewDecoder(body).Decode(&authorData); err != nil {
-			info.Printf("authorData json decode failed: %v", err)
+			appengine.Error(ctx, "authorData json decode failed: %v", err)
 			return err
 		}
 		result.Creator = authorData.Name
@@ -296,13 +290,13 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 
 	// Load Post Tags
 	tagsLink := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/categories?post=%d", id)
-	info.Printf("Tags: %s", tagsLink)
+	appengine.Info(ctx, "Tags: %s", tagsLink)
 	err = fetchParse(ctx, tagsLink, func(body io.Reader) error {
 		var tagData []struct {
 			Name string `json:"name"`
 		}
 		if err = json.NewDecoder(body).Decode(&tagData); err != nil {
-			info.Printf("tagData json decode failed: %v", err)
+			appengine.Error(ctx, "tagData json decode failed: %v", err)
 			return err
 		}
 		for _, tag := range tagData {
@@ -315,7 +309,7 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 	}
 
 	// Reload a majority of the post to fetch the correct asset order
-	err = mine(ctx, info, result)
+	err = mine(ctx, result)
 	if err != nil {
 		return result, err
 	}
@@ -334,10 +328,10 @@ func mineFull(ctx context.Context, info *log.Logger, id int64) (*models.Post, er
 
 	// Print error for missing media metadata
 	if len(missed) > 0 {
-		info.Printf("Unable to find media %v in meta %v", missed, meta)
+		appengine.Warning(ctx, "Unable to find media %v in meta %v", missed, meta)
 	}
 	if len(meta) > 0 {
-		info.Printf("Leftover meta from JSON endpoint: %v", meta)
+		appengine.Warning(ctx, "Leftover meta from JSON endpoint: %v", meta)
 	}
 
 	return result, nil
@@ -356,9 +350,9 @@ func fetchParse(ctx context.Context, url string, fn func(io.Reader) error) error
 	return fn(body)
 }
 
-func fetchMediaPage(ctx context.Context, info *log.Logger, id, page int64, meta map[int64]models.Media) error {
+func fetchMediaPage(ctx context.Context, id, page int64, meta map[int64]models.Media) error {
 	mediaLink := fmt.Sprintf("https://thechive.com/wp-json/wp/v2/media?parent=%d&page=%d", id, page)
-	info.Printf("Media: %s", mediaLink)
+	appengine.Info(ctx, "Media: %s", mediaLink)
 	return fetchParse(ctx, mediaLink, func(body io.Reader) error {
 		var mediaData []struct {
 			ID      int64      `json:"id"`
@@ -370,7 +364,7 @@ func fetchMediaPage(ctx context.Context, info *log.Logger, id, page int64, meta 
 			} `json:"media_details"`
 		}
 		if err := json.NewDecoder(body).Decode(&mediaData); err != nil {
-			info.Printf("mediaData json decode failed: %v", err)
+			appengine.Error(ctx, "mediaData json decode failed: %v", err)
 			return err
 		}
 		// info.Printf("mediaData: %v", mediaData)
@@ -387,19 +381,19 @@ func fetchMediaPage(ctx context.Context, info *log.Logger, id, page int64, meta 
 	})
 }
 
-func mineMedia(rctx context.Context, info *log.Logger, post *models.Post) error {
+func mineMedia(rctx context.Context, post *models.Post) error {
 	ctx, span := trace.StartSpan(rctx, "cron.mineMedia")
 	defer span.End()
 	span.AddAttributes(trace.Int64Attribute(`id`, post.ID))
 
-	if err := mine(ctx, logDefault(), post); err != nil {
+	if err := mine(ctx, post); err != nil {
 		return err
 	}
 
 	meta := make(map[int64]models.Media)
 	limit := int64(math.Ceil(float64(len(post.Media)) / 10)) // paginated to 10 pages per thing
 	for i := int64(1); i <= limit; i++ {
-		if err := fetchMediaPage(ctx, info, post.ID, i, meta); err != nil {
+		if err := fetchMediaPage(ctx, post.ID, i, meta); err != nil {
 			return err
 		}
 	}
@@ -418,10 +412,10 @@ func mineMedia(rctx context.Context, info *log.Logger, post *models.Post) error 
 
 	// Print error for missing media metadata
 	if len(missed) > 0 {
-		info.Printf("Unable to find media %v in meta %v", missed, meta)
+		appengine.Warning(ctx, "Unable to find media %v in meta %v", missed, meta)
 	}
 	if len(meta) > 0 {
-		info.Printf("Leftover meta from JSON endpoint: %v", meta)
+		appengine.Warning(ctx, "Leftover meta from JSON endpoint: %v", meta)
 	}
 
 	return nil

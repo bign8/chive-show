@@ -5,9 +5,9 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"log"
 
 	"cloud.google.com/go/datastore"
+	"github.com/bign8/chive-show/appengine"
 	"github.com/googleapis/google-cloud-go-testing/datastore/dsiface"
 	"go.opencensus.io/trace"
 )
@@ -110,7 +110,7 @@ func getKeys(ctx context.Context, store dsiface.Client, name string) ([]*datasto
 
 	// Datastore MISS
 	if err == datastore.ErrNoSuchEntity { // FYI: this is a costly operation
-		log.Printf("INFO: Datastore MISS: Costly Query getting keys over %q", name)
+		appengine.Info(c, "Datastore MISS: Costly Query getting keys over %q", name)
 		err = nil
 		keys, err := store.GetAll(c, datastore.NewQuery(name).KeysOnly(), nil)
 		if err != nil {
