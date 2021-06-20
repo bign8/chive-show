@@ -3,9 +3,11 @@ package cron
 import (
 	"context"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 
@@ -31,6 +33,8 @@ var Some white space trash = {
 `
 
 func TestMine(t *testing.T) {
+	trans := client.Transport
+	defer func() { client.Transport = trans }()
 	client.Transport = rt(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{
 			StatusCode: http.StatusOK,
@@ -70,4 +74,13 @@ func ExampleMineHandler() {
 	// enc.SetIndent(``, ` `)
 	// enc.SetEscapeHTML(false)
 	// enc.Encode(post)
+}
+
+func TestMineFull(t *testing.T) {
+	l := log.New(os.Stderr, ``, 0)
+	post, err := mineFull(context.Background(), l, 3701780)
+	if err != nil {
+		t.Fatalf("Unable to mine full: %v", err)
+	}
+	t.Logf("TODO: make assertions on %v", post)
 }
