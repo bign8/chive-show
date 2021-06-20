@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/bign8/chive-show/api"
@@ -14,7 +13,7 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir("static")))
 	http.HandleFunc("/_ah/warmup", func(w http.ResponseWriter, r *http.Request) {
 		// Needed to be able to migrate traffic on promotion.
-		log.Println("Warmup Done")
+		appengine.Notice(r.Context(), "Warmup Done")
 		http.Error(w, "warm!", http.StatusOK)
 	})
 

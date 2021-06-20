@@ -3,11 +3,11 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 
+	"github.com/bign8/chive-show/appengine"
 	"github.com/bign8/chive-show/models"
 )
 
@@ -37,7 +37,7 @@ func handle(fn func(context.Context, *models.ListOptions) (*models.ListResult, e
 
 		// Parse request parameters
 		count := getURLCount(r.URL)
-		log.Printf("INFO: Requested %v posts", count)
+		appengine.Info(r.Context(), "Requested %d posts", count)
 
 		// Fire the real request
 		opts := &models.ListOptions{
@@ -47,7 +47,7 @@ func handle(fn func(context.Context, *models.ListOptions) (*models.ListResult, e
 		}
 		res, err := fn(r.Context(), opts)
 		if err != nil {
-			log.Printf("api(handle): %v", err)
+			appengine.Warning(r.Context(), "Failed to process list handler: %v", err)
 			enc.Encode(response{
 				Status: "error",
 				Code:   http.StatusInternalServerError,
@@ -88,7 +88,7 @@ func tags(fn func(context.Context) (map[string]int, error)) http.HandlerFunc {
 		// Fire the real request
 		res, err := fn(r.Context())
 		if err != nil {
-			log.Printf("api(tags): %v", err)
+			appengine.Warning(r.Context(), "Failed to process tags handler: %v", err)
 			enc.Encode(response{
 				Status: "error",
 				Code:   http.StatusInternalServerError,

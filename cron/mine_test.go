@@ -3,11 +3,9 @@ package cron
 import (
 	"context"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 
@@ -43,7 +41,7 @@ func TestMine(t *testing.T) {
 		}, nil
 	})
 	post := models.Post{Link: "testing"}
-	if err := mine(context.TODO(), logDefault(), &post); err != nil {
+	if err := mine(context.TODO(), &post); err != nil {
 		t.Fatal(err)
 	}
 	if len(post.Media) != 3 {
@@ -77,8 +75,7 @@ func ExampleMineHandler() {
 }
 
 func TestMineFull(t *testing.T) {
-	l := log.New(os.Stderr, ``, 0)
-	post, err := mineFull(context.Background(), l, 3701780)
+	post, err := mineFull(context.Background(), 3701780)
 	if err != nil {
 		t.Fatalf("Unable to mine full: %v", err)
 	}
