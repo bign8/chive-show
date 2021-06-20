@@ -5,9 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"errors"
-	"regexp"
 	"time"
 
 	"cloud.google.com/go/datastore"
@@ -18,12 +16,12 @@ const POST = "Post"
 
 // Img the model for a post in an image
 type Media struct {
-	URL      string `json:"url" xml:"url,attr"`
-	Title    string `json:"title,omitempty" xml:"-"` // the xml titles are worthless (especially now that the full content isn't present)
-	Rating   string `json:"-" xml:"rating"`
-	Category string `json:"-" xml:"category"`
-	Caption  string `json:"caption,omitempty" xml:"-"` // .gallery-caption when scraping page content
-	// Type     string `datastore:"type" json:"type" xml:"-"` // loaded when scraping content: attachment (for images), gif (for videos)
+	ID      int64  `json:"id,omitempty"`      // used for matching media metadata to attachment ordering
+	URL     string `json:"url"`               // literal link for the asset in question
+	Title   string `json:"title,omitempty"`   // the xml titles are worthless (especially now that the full content isn't present)
+	Caption string `json:"caption,omitempty"` // .gallery-caption when scraping page content
+	Height  int    `json:"height,omitempty"`
+	Width   int    `json:"width,omitempty"`
 }
 
 // Post data object
@@ -35,6 +33,10 @@ type Post struct {
 	Title   string    `datastore:"title,noindex" json:"title"`
 	Creator string    `datastore:"creator,noindex" json:"creator"`
 	MugShot string    `datastore:"mugshot,noindex" json:"mugshot"`
+	Thumb   string    `datastore:"thumbnail,noindex" json:"thumbnail"`
+
+	// What version of the miner was used to scrape this post together?
+	Version int `datastore:"version" json:"version"`
 
 	// Attributes tweaked to minimize transactions (LoadSaver stuff)
 	MediaBytes []byte  `datastore:"media,noindex" json:"-"`
@@ -68,7 +70,9 @@ func (x *Post) Load(c []datastore.Property) error {
 func (x *Post) Save() ([]datastore.Property, error) {
 	var buffer bytes.Buffer
 	stream := gzip.NewWriter(&buffer)
-	if err := json.NewEncoder(stream).Encode(&x.Media); err != nil {
+	enc := json.NewEncoder(stream)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(&x.Media); err != nil {
 		return nil, err
 	}
 	if err := stream.Close(); err != nil {
@@ -76,34 +80,6 @@ func (x *Post) Save() ([]datastore.Property, error) {
 	}
 	x.MediaBytes = buffer.Bytes()
 	return datastore.SaveStruct(x)
-}
-
-var clean = regexp.MustCompile(`\W\(([^\)]*)\)$`)
-
-// UnmarshalXML implements xml.Unmarshaler for custom unmarshaling logic : https://golang.org/pkg/encoding/xml/#Unmarshaler
-func (x *Post) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
-	var post struct {
-		ID      int64    `xml:"post-id"`
-		Tags    []string `xml:"category"`
-		Link    string   `xml:"link"`
-		Date    string   `xml:"pubDate"`
-		Title   string   `xml:"title"`
-		Creator string   `xml:"creator"`
-		Media   []Media  `xml:"content"`
-	}
-	if err = d.DecodeElement(&post, &start); err != nil {
-		return err
-	}
-	x.ID = post.ID
-	x.Tags = post.Tags
-	x.Link = post.Link
-	x.Title = clean.ReplaceAllLiteralString(post.Title, "")
-	x.Creator = post.Creator
-	x.Media = post.Media // TODO: do mugshot scrubbing here
-	if x.Date, err = time.Parse(time.RFC1123Z, post.Date); err != nil {
-		return err
-	}
-	return nil
 }
 
 // Storage based errors
@@ -119,7 +95,9 @@ type Store interface {
 	Tags(ctx context.Context) (map[string]int, error) // name => len(posts)
 	// Delete(ctx context.Context, ids []int) error
 	PutMulti(ctx context.Context, posts []Post) error
-	Has(ctx context.Context, post Post) (bool, error)
+	Has(ctx context.Context, id int64) (bool, error)
+	Get(ctx context.Context, id int64) (*Post, error)
+	Put(ctx context.Context, post *Post) error
 }
 
 type ListOptions struct {

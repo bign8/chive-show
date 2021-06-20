@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/datastore"
+
 	"github.com/bign8/chive-show/models"
 )
 
@@ -44,7 +45,9 @@ func TestUpdateTags(t *testing.T) {
 		{Tags: []string{"a", "d", "e"}},
 		{Tags: []string{"a", "f", "g"}},
 	}
-	err := updateTags(context.TODO(), &fake{}, posts)
+	err := updateTags(context.TODO(), &fakeClient{
+		txn: &fakeTransaction{},
+	}, posts)
 	if err != nil {
 		t.Fatalf("UpdateTags Failed: %v", err)
 	}
@@ -52,7 +55,7 @@ func TestUpdateTags(t *testing.T) {
 
 func TestTags(t *testing.T) {
 	s := &Store{
-		store: &fake{
+		store: &fakeClient{
 			getAll: func(obj interface{}) ([]*datastore.Key, error) {
 				*(obj.(*[]Tag)) = []Tag{{Count: 3}}
 				return []*datastore.Key{

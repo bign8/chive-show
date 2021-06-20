@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/datastore"
+	"github.com/googleapis/google-cloud-go-testing/datastore/dsiface"
 	"go.opencensus.io/trace"
 	"google.golang.org/api/iterator"
 
@@ -29,26 +30,15 @@ func NewStore() (*Store, error) {
 		rebuildTags(store)
 	}
 	return &Store{
-		store:   store,
+		store:   dsiface.AdaptClient(store),
 		getKeys: getKeys,
 	}, nil
 }
 
 type Store struct {
-	store   datastoreClient
+	store   dsiface.Client
 	stash   map[int64]bool
-	getKeys func(c context.Context, store datastoreClient, name string) ([]*datastore.Key, error) // for testing
-}
-
-// allow faking out of the datastore for unit tests
-type datastoreClient interface {
-	Get(context.Context, *datastore.Key, interface{}) error
-	GetAll(context.Context, *datastore.Query, interface{}) ([]*datastore.Key, error)
-	Put(context.Context, *datastore.Key, interface{}) (*datastore.Key, error)
-	GetMulti(context.Context, []*datastore.Key, interface{}) error
-	PutMulti(context.Context, []*datastore.Key, interface{}) ([]*datastore.Key, error)
-	Run(context.Context, *datastore.Query) *datastore.Iterator
-	RunInTransaction(ctx context.Context, f func(tx *datastore.Transaction) error, opts ...datastore.TransactionOption) (cmt *datastore.Commit, err error)
+	getKeys func(c context.Context, store dsiface.Client, name string) ([]*datastore.Key, error) // for testing
 }
 
 var _ models.Store = (*Store)(nil)
@@ -243,9 +233,9 @@ func (s *Store) List(rctx context.Context, opts *models.ListOptions) (*models.Li
 	return result, nil
 }
 
-func (s *Store) Has(rctx context.Context, post models.Post) (bool, error) {
+func (s *Store) Has(rctx context.Context, id int64) (bool, error) {
 	if s.stash != nil {
-		return s.stash[post.ID], nil
+		return s.stash[id], nil
 	}
 	ctx, span := trace.StartSpan(rctx, "store.Has")
 	defer span.End()
@@ -258,7 +248,7 @@ func (s *Store) Has(rctx context.Context, post models.Post) (bool, error) {
 		s.stash[key.ID] = true
 	}
 	span.AddAttributes(trace.Int64Attribute("keys", int64(len(keys))))
-	return s.stash[post.ID], nil
+	return s.stash[id], nil
 }
 
 func (s *Store) PutMulti(rctx context.Context, posts []models.Post) error {
@@ -285,4 +275,21 @@ func (s *Store) PutMulti(rctx context.Context, posts []models.Post) error {
 		return err
 	}
 	return addKeys(ctx, s.store, models.POST, complete)
+}
+
+func (s *Store) Put(ctx context.Context, post *models.Post) error {
+	return s.PutMulti(ctx, []models.Post{*post})
+}
+
+func (s *Store) Get(rctx context.Context, id int64) (*models.Post, error) {
+	ctx, span := trace.StartSpan(rctx, "store.PutMulti")
+	defer span.End()
+	span.AddAttributes(trace.Int64Attribute("id", id))
+
+	post := models.Post{} // allocation!
+	err := s.store.Get(ctx, datastore.IDKey(models.POST, id, nil), &post)
+	if err != nil {
+		return nil, err
+	}
+	return &post, nil
 }

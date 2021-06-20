@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"cloud.google.com/go/datastore"
+	"github.com/googleapis/google-cloud-go-testing/datastore/dsiface"
 	"go.opencensus.io/trace"
 
 	"github.com/bign8/chive-show/models"
@@ -103,13 +104,13 @@ func rebuildTags(db *datastore.Client) {
 	log.Printf("INFO: Rebuilt %d tags", len(tags))
 }
 
-func updateTags(ctx context.Context, client datastoreClient, posts []models.Post) error {
+func updateTags(ctx context.Context, client dsiface.Client, posts []models.Post) error {
 	tags := posts2tagMap(posts)
 	keys := make([]*datastore.Key, 0, len(tags))
 	for tag := range tags {
 		keys = append(keys, tagKey(tag))
 	}
-	_, err := client.RunInTransaction(ctx, func(tx *datastore.Transaction) error {
+	_, err := client.RunInTransaction(ctx, func(tx dsiface.Transaction) error {
 		tagz := make([]Tag, len(keys))
 		err := tx.GetMulti(keys, tagz)
 		err = ignoreNoneSuchEntity(err)
