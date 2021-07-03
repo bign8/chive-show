@@ -34,3 +34,11 @@ int:
 	@echo "This requires 'make serve' to be running"
 	go test . -v -target http://localhost:8080
 .PHONY:=int
+
+event:
+	curl \
+		-i \
+		-X POST \
+		-H "Accept: application/vnd.github.v3+json" \
+		https://api.github.com/repos/bign8/chive-show/dispatches \
+		-d '{"event_type":"dependabot"}'
