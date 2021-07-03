@@ -16,7 +16,8 @@ name: Dependabot
 #   pull_request:
 #     types: [closed]
 on:
-  repository_dispatch
+  repository_dispatch:
+    types: [dependabot]
 jobs:
   dependabot:
     # if: github.event.pull_request.merged == true
