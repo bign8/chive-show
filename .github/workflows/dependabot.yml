@@ -11,20 +11,22 @@
 #      * Check if IB exists; if not, create a new IB based off of MB (branches are deleted after merge)
 #      * Otherwise, merge MB into IB
 
-name: Dependabot
+# Until this becomes painfully obvious to me... I'll do it in ./dependabot.sh
+
+# name: Dependabot
+# # on:
+# #   pull_request:
+# #     types: [closed]
 # on:
-#   pull_request:
-#     types: [closed]
-on:
-  repository_dispatch:
-    types: [dependabot]
-jobs:
-  dependabot:
-    # if: github.event.pull_request.merged == true
-    name: Dependabot
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Create or Update dependabot/go_modules
-        run: |
-          # TODO: some automated process that works on remote machines that are difficult to debug
+#   repository_dispatch:
+#     types: [dependabot]
+# jobs:
+#   dependabot:
+#     # if: github.event.pull_request.merged == true
+#     name: Dependabot
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v2
+#       - name: Create or Update dependabot/go_modules
+#         run: |
+#           # TODO: some automated process that works on remote machines that are difficult to debug
