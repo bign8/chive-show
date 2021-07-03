@@ -1,0 +1,29 @@
+# Dependabot Workflows DO NOT provide access to enviornment secrets.
+# https://github.com/dependabot/dependabot-core/issues/3253#issuecomment-852541544
+# As such, this is a bit of a... work-around to get some sort of automatic dependency updating working.
+#
+# Desired Setup:
+#   1. Dependabot targets an integration branch "dependabot/go_modules" (herby referenced as IB) instad of a main branch (herby referenced as MB)
+#      * The bot is unable to create and manage the IB based off of an MB... so...
+#   2. PRs into IB should be setup to automerge when tests pass (just Unit, not Deployment)
+#   3. Users can base off of IB when creating new PRs OR a PR can be made from IB into MB
+#   4. Whenever a PR to MB is merged
+#      * Check if IB exists; if not, create a new IB based off of MB (branches are deleted after merge)
+#      * Otherwise, merge MB into IB
+
+name: Dependabot
+# on:
+#   pull_request:
+#     types: [closed]
+on:
+  repository_dispatch
+jobs:
+  dependabot:
+    # if: github.event.pull_request.merged == true
+    name: Dependabot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Create or Update dependabot/go_modules
+        run: |
+          # TODO: some automated process that works on remote machines that are difficult to debug
