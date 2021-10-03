@@ -5,11 +5,6 @@
 
 Ever want a safe for work slideshow of the images from *"Probably the best site in the World"*?  Well now you can enjoy these amazing images without the distractions when viewing them within their original context.
 
-# Features
-- Awesome UI and UX
-- Fully featured and self discoverable API
-- Much more to come...
-
 # The obligatory questions
 As with any open source project, there are always someone wondering what the backstory of the project is.  These are my attempts to answer those questions.
 
@@ -30,7 +25,6 @@ I enjoy learning new technologies and this project allows me to tinker with seve
 
 - Google App Engine
 - Go lang
-- Dart (possibly)
 - 100% test coverage (hell no)
 - CI runs all the time
 - Lots of good API things
