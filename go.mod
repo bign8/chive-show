@@ -13,7 +13,7 @@ require (
 	github.com/anaskhan96/soup v1.2.4
 	github.com/googleapis/google-cloud-go-testing v0.0.0-20210427215956-1487aa9ec5b0
 	go.opencensus.io v0.23.0
-	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
+	golang.org/x/net v0.7.0
 	google.golang.org/api v0.58.0
 	google.golang.org/genproto v0.0.0-20210924002016-3dee208752a0
 )
