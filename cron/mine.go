@@ -136,12 +136,7 @@ func mine(ctx context.Context, post *models.Post) error {
 	if idx < 0 {
 		return errors.New("unable to find opening brace")
 	}
-	src = src[idx:]
-	idx = strings.LastIndexByte(src, '}')
-	if idx < 0 {
-		return errors.New("unable to find closing brace")
-	}
-	src = src[:idx+1]
+	stream := strings.NewReader(src[idx:])
 	var what struct {
 		Items []struct {
 			ID   int64  `json:"id"`
@@ -149,7 +144,7 @@ func mine(ctx context.Context, post *models.Post) error {
 			Type string `json:"type"`
 		} `json:"items"`
 	}
-	err = json.Unmarshal([]byte(src), &what)
+	err = json.NewDecoder(stream).Decode(&what)
 	if err != nil {
 		panic(err)
 	}
