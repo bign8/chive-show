@@ -20,7 +20,6 @@ jobs:
       - name: 'Use gcloud CLI'
         run: 'gcloud info'
 
-      # Warning: soon to break: https://github.blog/changelog/2022-10-11-github-actions-deprecating-save-state-and-set-output-commands/
       - name: Deploy to staging
         id: deploy
         env:
@@ -29,7 +28,7 @@ jobs:
         run: |
           gcloud app deploy --version pr-$VERSION --project $PROJECT --no-promote --quiet
           RES=`gcloud app browse --project=$PROJECT --version=pr-$VERSION 2>&1 | tail -n 1`
-          echo "::set-output name=url::$RES"
+          echo "url=$RES" >> $GITHUB_OUTPUT
 
       # Run an integration suite against the deployed service
       - name: Set up Go
