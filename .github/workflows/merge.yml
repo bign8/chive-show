@@ -8,8 +8,7 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      
+
       # copy/pasta: https://github.com/google-github-actions/setup-gcloud#service-account-key-json 
       - id: 'auth'
         uses: 'google-github-actions/auth@v1'
