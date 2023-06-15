@@ -8,12 +8,17 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@master
+
+      # copy/pasta: https://github.com/google-github-actions/setup-gcloud#service-account-key-json 
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v1'
         with:
-          project_id: crucial-alpha-706
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v1'
+      - name: 'Use gcloud CLI'
+        run: 'gcloud info'
+
       - name: Deploy to staging
         id: deploy
         env:
