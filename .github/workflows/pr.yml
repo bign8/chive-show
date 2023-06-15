@@ -20,6 +20,7 @@ jobs:
       - name: 'Use gcloud CLI'
         run: 'gcloud info'
 
+      # Warning: soon to break: https://github.blog/changelog/2022-10-11-github-actions-deprecating-save-state-and-set-output-commands/
       - name: Deploy to staging
         id: deploy
         env:
