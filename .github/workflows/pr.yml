@@ -35,8 +35,6 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: 1.16
-      - name: Get dependencies
-        run: go mod download
       - name: Integration
         env:
           ADDRESS: ${{ steps.deploy.outputs.url }}
@@ -52,7 +50,7 @@ jobs:
             const body = 'Deployed to ' + process.env.ADDRESS + ' for manual testing.'
             console.log(body, context)
 
-            const comments = await github.paginate(github.issues.listComments, {
+            const comments = await github.paginate(github.rest.issues.listComments, {
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo
@@ -61,7 +59,7 @@ jobs:
             // Try to find/update an existing comment
             for (const comment of comments) {
               if (comment.body.startsWith('Deployed to ')) {
-                await github.issues.updateComment({
+                await github.rest.issues.updateComment({
                   comment_id: comment.id,
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -72,7 +70,7 @@ jobs:
             }
 
             // Create a new one
-            await github.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
