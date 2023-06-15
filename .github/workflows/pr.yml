@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: ./.github/actions/gcloud
+      - uses: ./.github/actions/gcloud.yml
 
       - name: Deploy to staging
         id: deploy
