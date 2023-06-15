@@ -52,12 +52,11 @@ jobs:
             const body = 'Deployed to ' + process.env.ADDRESS + ' for manual testing.'
             console.log(body, context)
 
-            const opts = github.issues.listComments.endpoint.merge({
+            const comments = await github.paginate(github.issues.listComments, {
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo
             })
-            const comments = await github.paginate(opts)
 
             // Try to find/update an existing comment
             for (const comment of comments) {
