@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@main
         with:
           project_id: crucial-alpha-706
           service_account_key: ${{ secrets.GCP_SA_KEY }}
